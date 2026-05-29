@@ -151,5 +151,6 @@ krx_data_api/
 
 ## 라이선스 / 관련
 
-- 매뉴얼: `c:\Users\Peter\github\KRX_로그인_세션_매뉴얼.md`
-- 사용 프로젝트 인벤토리: `c:\Users\Peter\github\KRX_데이터_프로젝트_정리.md`
+- 매뉴얼: [docs/KRX_로그인_세션_매뉴얼.md](docs/KRX_로그인_세션_매뉴얼.md)
+- 사용 프로젝트 인벤토리: [docs/KRX_데이터_프로젝트_정리.md](docs/KRX_데이터_프로젝트_정리.md)
+- 구 호출 패턴 참고: [docs/KRX_OLD_호출_패턴_참고.md](docs/KRX_OLD_호출_패턴_참고.md)
