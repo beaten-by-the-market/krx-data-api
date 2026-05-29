@@ -10,15 +10,11 @@ KRX 정보데이터시스템(`data.krx.co.kr`) 호출을 친절한 이름의 함
 
 ## 설치
 
-### 로컬 editable 설치
-```powershell
-pip install -e c:\Users\Peter\github\krx-data-api
+```bash
+pip install git+https://github.com/beaten-by-the-market/krx-data-api.git
 ```
 
-### Google Colab
-```python
-!pip install git+https://github.com/beaten-by-the-market/krx-data-api.git
-```
+Colab에서는 앞에 `!` 를 붙입니다.
 
 ## 사용법
 
