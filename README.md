@@ -18,10 +18,33 @@ Colab에서는 앞에 `!` 를 붙입니다.
 
 ## 사용법
 
-### 모든 엔드포인트 (현재 KRX 정책상 자격증명 필수)
+> 2026-05 시점 KRX 정책 변경으로, 이 패키지의 **모든 호출은 KRX 자체계정 로그인이 필요**합니다.
+> 따라서 자격증명 설정이 첫 단계입니다.
 
-> 2026-05 시점 KRX 정책 변경으로, 아래 모든 호출이 KRX 자체계정 로그인이 필요합니다.
-> `.env`에 `KRX_ID`/`KRX_PW`를 넣어두면 첫 호출에서 자동 로그인되고 25분 싱글톤 세션이 재사용됩니다.
+### 1단계 — 자격증명 설정 (필수)
+
+KRX 자체계정의 ID/PW를 환경변수 `KRX_ID` / `KRX_PW`로 등록합니다. 
+한번 등록해두면 첫 `fetch()` 호출 시 자동 로그인되고, 25분간 같은 세션이 재사용됩니다.
+
+**로컬 (PC):** 프로젝트를 실행할 작업 디렉터리(노트북이 있는 폴더)에 `.env` 파일을 만들고 아래 내용 저장:
+```
+KRX_ID=your_id
+KRX_PW=your_password
+```
+`python-dotenv`가 의존성에 포함되어 있어 자동으로 읽힙니다. 
+`.env`는 `.gitignore`에 추가해서 커밋되지 않도록 하세요.
+
+**Google Colab:** 좌측 사이드바의 🔑 (Secrets)에 `KRX_ID`, `KRX_PW`를 등록한 뒤, 노트북 첫 셀에:
+```python
+from google.colab import userdata
+import os
+os.environ["KRX_ID"] = userdata.get("KRX_ID")
+os.environ["KRX_PW"] = userdata.get("KRX_PW")
+```
+
+자격증명 미설정 시 첫 호출에서 `KRXAuthRequiredError`가 발생합니다.
+
+### 2단계 — 데이터 가져오기
 
 ```python
 from krx_data_api import fetch
@@ -53,49 +76,35 @@ df = fetch("treasury_market", strtDd="20240101", endDd="20260101")
 df = fetch("listed_bonds")
 ```
 
-전체 엔드포인트 목록:
+사용 가능한 엔드포인트 목록 전체는 아래 [엔드포인트 카탈로그](#엔드포인트-카탈로그-v010) 표 참조. 
+프로그래밍적으로 확인하려면:
 ```python
 from krx_data_api import list_endpoints, endpoint_info
-print(list_endpoints())
-print(endpoint_info("all_stock_price"))
+print(list_endpoints())                 # 모든 이름 리스트
+print(endpoint_info("all_stock_price")) # 특정 엔드포인트 상세
 ```
 
-### 로그인 필요한 엔드포인트
+### 3단계 (선택) — 고급 사용
 
-`.env` 파일에 자격증명 등록(또는 환경변수):
-```
-KRX_ID=your_id
-KRX_PW=your_password
-```
+대부분 `fetch("name")` 한 줄로 충분합니다. 다음은 특수한 경우에만 필요한 옵션들입니다.
 
+**`auth=True`** — 첫 호출 전에 미리 로그인. 호출 횟수 한 번 절약:
 ```python
-df = fetch("some_protected_endpoint", auth=True)
+df = fetch("listed_stocks", auth=True)
 ```
+없어도 첫 호출이 `LOGOUT`을 받으면 자동 로그인 후 재시도하므로 결과는 동일합니다.
 
-자격증명이 `KRX_ID` / `KRX_PW` 환경변수에 있으면 자동으로 25분 싱글톤 세션이 만들어지고
-만료 시 자동 재로그인된다. 직접 인증 객체를 다루고 싶을 때:
+**`get_krx_auth()`** — `requests.Session`을 직접 다뤄야 할 때:
 ```python
 from krx_data_api import get_krx_auth
 auth = get_krx_auth()
-print(auth.mbr_no)            # 로그인된 MBR_NO
-session = auth.session        # requests.Session — 직접 사용 가능
+print(auth.mbr_no)       # 로그인된 MBR_NO
+session = auth.session   # requests.Session 그대로 사용
 ```
 
-> **주의** — KRX 로그인 응답이 `_error_code == "CD007"`이면 `MBR_NO`가 발급되더라도
-> 실제로는 인증되지 않은 위장 성공이다. `auth.py`는 **`CD001`만 성공으로 인정**하고
-> 그 외에는 `KRXAuthError`를 던진다.
-
-### Google Colab에서 자격증명
-
-```python
-from google.colab import userdata
-import os
-os.environ["KRX_ID"] = userdata.get("KRX_ID")
-os.environ["KRX_PW"] = userdata.get("KRX_PW")
-
-from krx_data_api import fetch
-df = fetch("listed_stocks")
-```
+> **참고** — KRX 로그인 응답이 `_error_code == "CD007"`이면 `MBR_NO`가 발급되더라도
+> 실제로는 인증되지 않은 위장 성공입니다. `auth.py`는 **`CD001`만 성공으로 인정**하고
+> 그 외에는 `KRXAuthError`를 던집니다 (자동으로 처리되므로 사용자가 신경 쓸 일은 없음).
 
 ## 카탈로그에 없는 새 화면 호출
 
