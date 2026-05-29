@@ -17,7 +17,7 @@ pip install -e c:\Users\Peter\github\krx-data-api
 
 ### Google Colab
 ```python
-!pip install git+https://github.com/<user>/krx-data-api.git
+!pip install git+https://github.com/beaten-by-the-market/krx-data-api.git
 ```
 
 ## 사용법
