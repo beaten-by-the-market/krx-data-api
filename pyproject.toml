@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "krx-data-api"
+version = "0.1.0"
+description = "KRX 정보데이터시스템(data.krx.co.kr) 호출 클라이언트 — OTP CSV 다운로드, JSON API, 로그인 세션"
+requires-python = ">=3.9"
+dependencies = [
+    "requests",
+    "pandas",
+    "python-dotenv",
+]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[tool.setuptools.packages.find]
+include = ["krx_data_api*"]
