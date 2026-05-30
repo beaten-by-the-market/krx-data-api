@@ -40,6 +40,7 @@ def test_catalog_lists_12_endpoints():
         "supervised",
         "unfaithful_disclosure",
         "listing_special",
+        "ipo_price_return",
         "listed_bonds",
         "equity_index",
     ):
@@ -64,3 +65,12 @@ def test_all_stock_price_recent_day():
 def test_supervised_json():
     df = fetch("supervised")
     assert isinstance(df, pd.DataFrame)
+
+
+def test_ipo_price_return_json():
+    df = fetch("ipo_price_return")
+    assert isinstance(df, pd.DataFrame)
+    assert len(df) > 0
+    # 공모가 대비 주가수익률 화면의 핵심 컬럼
+    assert "ASSTCOM_NM" in df.columns
+    assert "PUBOFR_FINAL_PRC" in df.columns

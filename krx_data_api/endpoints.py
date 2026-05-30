@@ -114,6 +114,26 @@ ENDPOINTS = {
         "post": ["read_csv_eucKR"],
         "screen": "상장특례 현황",
     },
+    # listing_special과 bld는 같지만(MDCSTAT24401) 파라미터/호출방식이 달라
+    # 별도 화면(코스닥상장기업 주관사별 IPO 현황의 공모가 대비 주가수익률)을 서비스한다.
+    "ipo_price_return": {
+        "bld": "dbms/MDC/STAT/issue/MDCSTAT24401",
+        "method": "json",
+        "menu_id": "MDC02021301",
+        "defaults": {
+            "isuCd": "ALL",
+            "isuCd2": "ALL",
+            "param1isuCd_finder_stkisu4_1": "KSQ",  # 코스닥
+            "majagntComCd": "",                      # 주관사 = 전체
+            "tecComType": "TEC",                     # 기업구분 = 기술성장기업
+            "listTrack": "",                         # 상장트랙 = 전체
+            "money": "1",
+            "otherUnit": "1",
+            "csvxls_isNo": "false",
+        },
+        "post": ["json_output_to_df"],
+        "screen": "20043 공모가 대비 주가수익률",
+    },
     "listed_bonds": {
         "bld": "dbms/MDC/STAT/standard/MDCSTAT10801",
         "method": "csv",
