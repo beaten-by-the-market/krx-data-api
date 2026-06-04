@@ -144,6 +144,7 @@ df = pd.read_csv(BytesIO(raw), encoding="EUC-KR")
 | `treasury_market` | `MDCSTAT20701` | 20005 자사주취득/처분(전체) | CSV |
 | `supervised` | `MDCSTAT21401` | 20012 관리종목현황 | JSON |
 | `unfaithful_disclosure` | `MDCSTAT22001` | 20018 불성실공시법인 | JSON |
+| `vi_triggered` | `MDCSTAT22401` | 20023 변동성완화장치 발동종목 현황 | JSON |
 | `listing_special` | `MDCSTAT24401` | 상장특례 현황 | CSV |
 | `ipo_price_return` | `MDCSTAT24401` | 20043 공모가 대비 주가수익률 | JSON |
 | `listed_bonds` | `MDCSTAT10801` | 14011 상장채권 상세검색 | CSV |
@@ -156,7 +157,7 @@ krx_data_api/
 ├── __init__.py        공개 API re-export
 ├── transport.py       OTP 2단계 / JSON API 저수준 (내부 사용 권장)
 ├── auth.py            로그인 싱글톤 (CD001만 성공)
-├── endpoints.py       13개 bld 카탈로그
+├── endpoints.py       14개 bld 카탈로그
 ├── client.py          fetch() + 후처리 레지스트리
 └── exceptions.py
 ```

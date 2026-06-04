@@ -39,6 +39,7 @@ def test_catalog_lists_12_endpoints():
         "treasury_market",
         "supervised",
         "unfaithful_disclosure",
+        "vi_triggered",
         "listing_special",
         "ipo_price_return",
         "listed_bonds",
@@ -65,6 +66,15 @@ def test_all_stock_price_recent_day():
 def test_supervised_json():
     df = fetch("supervised")
     assert isinstance(df, pd.DataFrame)
+
+
+def test_vi_triggered_json():
+    day = _recent_trading_day()
+    df = fetch("vi_triggered", strtDd=day, endDd=day)
+    assert isinstance(df, pd.DataFrame)
+    # VI 발동 현황의 핵심 컬럼
+    assert "VI_KIND_NM" in df.columns
+    assert "VI_TG_TM" in df.columns
 
 
 def test_ipo_price_return_json():

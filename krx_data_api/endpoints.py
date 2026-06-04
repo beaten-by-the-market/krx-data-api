@@ -134,6 +134,22 @@ ENDPOINTS = {
         "post": ["json_output_to_df"],
         "screen": "20043 공모가 대비 주가수익률",
     },
+    "vi_triggered": {
+        "bld": "dbms/MDC/STAT/issue/MDCSTAT22401",
+        "method": "json",
+        "menu_id": "MDC0202",
+        "defaults": {
+            "mktId": "ALL",
+            "inqTpCd1": "01",   # 조회구분 = 일별
+            "viKindCd": "ALL",  # VI유형 = 전체(동적/정적)
+            "isuCd": "ALL",
+            "isuCd2": "ALL",
+            "param1isuCd_finder_stkisu1_0": "ALL",
+        },
+        "post": ["json_output_to_df"],
+        "screen": "20023 변동성완화장치 발동종목 현황",
+        "required": ["strtDd", "endDd"],
+    },
     "listed_bonds": {
         "bld": "dbms/MDC/STAT/standard/MDCSTAT10801",
         "method": "csv",
