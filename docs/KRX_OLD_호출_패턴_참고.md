@@ -96,13 +96,21 @@ df = fetch("supervised")
 | `dbms/MDC/STAT/standard/MDCSTAT01901` | 12005 | 전종목기본정보 | `listed_stocks` |
 | `dbms/MDC/STAT/standard/MDCSTAT01501` | 12001 | 전종목시세 | `all_stock_price` |
 | `dbms/MDC/STAT/standard/MDCSTAT01701` | 12003 | 개별종목시세추이 | `individual_price_trend` |
+| `dbms/MDC/STAT/standard/MDCSTAT02301` | 12009 | 투자자별 거래실적(개별종목) | `investor_trading_individual` |
+| `dbms/MDC/STAT/standard/MDCSTAT02301` | 12009 | 투자자별 거래실적(개별종목)(JSON) | `investor_trading_individual_json` |
 | `dbms/MDC/STAT/issue/MDCSTAT23801` | 20037 | 상장폐지종목 현황 | `delisted` |
+| `dbms/MDC/STAT/issue/MDCSTAT23801` | 20037 | 상장폐지종목 현황(JSON) | `delisted_json` |
 | `dbms/MDC/STAT/issue/MDCSTAT20001` | 20001 | 신규상장종목 현황 | `new_listing` |
+| `dbms/MDC/STAT/issue/MDCSTAT20001` | 20001 | 신규상장종목 현황(JSON) | `new_listing_json` |
+| `dbms/MDC/STAT/issue/MDCSTAT20201` | 20003 | 공모가대비 등락률 | `offering_price_change_rate` |
+| `dbms/MDC/STAT/issue/MDCSTAT20201` | 20003 | 공모가대비 등락률(JSON) | `offering_price_change_rate_json` |
 | `dbms/MDC/STAT/issue/MDCSTAT20601` | 20005 | 자사주취득/처분(개별) | `treasury_individual` |
 | `dbms/MDC/STAT/issue/MDCSTAT20701` | 20005 | 자사주취득/처분(전체) | `treasury_market` |
 | `dbms/MDC/STAT/issue/MDCSTAT21401` | 20012 | 관리종목현황 | `supervised` |
 | `dbms/MDC/STAT/issue/MDCSTAT22001` | 20018 | 불성실공시법인 | `unfaithful_disclosure` |
 | `dbms/MDC/STAT/issue/MDCSTAT24401` | - | 상장특례 현황 | `listing_special` |
+| `dbms/MDC/STAT/issue/MDCSTAT22401` | 20023 | 변동성완화장치 발동종목 현황(CSV) | `vi_triggered_csv` |
+| `dbms/MDC/STAT/srt/MDCSTAT30101` | 32001 | 개별종목 공매도 거래 | `short_selling_individual` |
 | `dbms/MDC/STAT/standard/MDCSTAT10801` | 14011 | 상장채권 상세검색 | `listed_bonds` |
 | `dbms/MDC/STAT/standard/MDCSTAT00301` | - | 지수 시세추이 | `equity_index` |
 
@@ -113,6 +121,7 @@ df = fetch("supervised")
 | `MDC0201020201` | 주식·기본정보 화면 (기본값) |
 | `MDC03010201` | 자사주·채권 화면 |
 | `MDC0202` | 상장특례 등 일부 |
+| `MDC0203` | 공매도 통계 |
 | `MDC02021301` | 신규/이전상장 |
 | `MDC0201020101` | 기업정보 |
 

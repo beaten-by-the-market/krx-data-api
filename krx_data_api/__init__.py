@@ -10,7 +10,7 @@
 
 로그인 필요한 엔드포인트
 -----------------------
->>> df = fetch("short_selling_all", trdDd="20260526", auth=True)  # 예시
+>>> df = fetch("short_selling_individual", trdDd="20260526", auth=True)  # 예시
 
 KRX_ID / KRX_PW 환경변수(또는 .env)에서 자격증명을 읽어 25분 싱글톤 세션을 유지.
 """

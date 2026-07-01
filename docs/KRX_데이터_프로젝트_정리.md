@@ -37,8 +37,11 @@ down_url = 'http://data.krx.co.kr/comm/fileDn/download_csv/download.cmd'
 | `dbms/MDC/STAT/standard/MDCSTAT01901` | 12005 | 전종목 기본정보 |
 | `dbms/MDC/STAT/standard/MDCSTAT01501` | 12001 | 전종목 시세 |
 | `dbms/MDC/STAT/standard/MDCSTAT01701` | 12003 | 개별종목 시세추이 |
+| `dbms/MDC/STAT/standard/MDCSTAT02301` | 12009 | 투자자별 거래실적(개별종목) |
 | `dbms/MDC/STAT/issue/MDCSTAT23801`    | 20037 | 상장폐지종목 현황 |
 | `dbms/MDC/STAT/issue/MDCSTAT20001`    | 20001 | 신규/이전상장 |
+| `dbms/MDC/STAT/issue/MDCSTAT20201`    | 20003 | 공모가대비 등락률 |
+| `dbms/MDC/STAT/srt/MDCSTAT30101`      | 32001 | 개별종목 공매도 거래 |
 
 ---
 

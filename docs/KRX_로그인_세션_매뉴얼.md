@@ -67,7 +67,7 @@ from app.krx_auth import get_krx_auth
 auth = get_krx_auth()
 df = auth.fetch("all_stock_price", trdDd="20260526")   # 전체 종목 시세
 df = auth.fetch("index_price")                          # 지수 시세
-df = auth.fetch("short_selling_all", trdDd="20260526")  # 공매도 전종목
+df = auth.fetch("short_selling_individual", trdDd="20260526")  # 공매도 전종목
 ```
 
 싱글톤이라 한 번 로그인하면 **25분간 세션 재사용**, 만료 시 자동 재로그인합니다.
