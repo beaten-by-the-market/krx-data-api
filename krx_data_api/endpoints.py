@@ -96,6 +96,49 @@ ENDPOINTS = {
         "screen": "12009 투자자별 거래실적(개별종목) (JSON)",
         "required": ["isuCd", "isuCd2", "strtDd", "endDd"],
     },
+    # MDCSTAT02303: 같은 12009 화면의 "일별추이" 탭.
+    # 02301(기간합계, 투자자 유형이 행)과 달리 날짜가 행, 투자자 유형이 열이다.
+    # askBid: 1=매수, 2=매도, 3=순매수 / trdVolVal: 1=거래량, 2=거래대금.
+    "investor_trading_individual_daily": {
+        "bld": "dbms/MDC/STAT/standard/MDCSTAT02303",
+        "method": "csv",
+        "menu_id": "MDC0201020302",
+        "defaults": {
+            "inqTpCd": "2",       # 일별추이
+            "trdVolVal": "2",     # 거래대금 (1=거래량)
+            "askBid": "3",        # 순매수 (1=매수, 2=매도)
+            "detailView": "1",
+            "tboxisuCd_finder_stkisu0_0": "",
+            "isuCd2": "",
+            "codeNmisuCd_finder_stkisu0_0": "",
+            "param1isuCd_finder_stkisu0_0": "ALL",
+            "money": "1",
+            "csvxls_isNo": "false",
+        },
+        "post": ["read_csv_eucKR"],
+        "screen": "12009 투자자별 거래실적(개별종목) 일별추이",
+        "required": ["isuCd", "strtDd", "endDd"],
+    },
+    "investor_trading_individual_daily_json": {
+        "bld": "dbms/MDC/STAT/standard/MDCSTAT02303",
+        "method": "json",
+        "menu_id": "MDC0201020302",
+        "defaults": {
+            "inqTpCd": "2",
+            "trdVolVal": "2",
+            "askBid": "3",
+            "detailView": "1",
+            "tboxisuCd_finder_stkisu0_0": "",
+            "isuCd2": "",
+            "codeNmisuCd_finder_stkisu0_0": "",
+            "param1isuCd_finder_stkisu0_0": "ALL",
+            "money": "1",
+            "csvxls_isNo": "false",
+        },
+        "post": ["json_output_to_df"],
+        "screen": "12009 투자자별 거래실적(개별종목) 일별추이 (JSON)",
+        "required": ["isuCd", "strtDd", "endDd"],
+    },
     "delisted": {
         "bld": "dbms/MDC/STAT/issue/MDCSTAT23801",
         "method": "csv",
@@ -131,6 +174,45 @@ ENDPOINTS = {
         "post": ["json_output_to_df"],
         "screen": "20037 상장폐지종목 현황 (JSON)",
         "required": ["strtDd", "endDd"],
+    },
+    # 주의: MDCSTAT23902(상폐시세)는 원주가만 제공하며 수정주가 옵션이 없습니다.
+    # adjStkPrc 계열 파라미터를 보내도 KRX가 무시합니다.
+    # 상폐종목 수정주가가 필요하면 individual_price_trend(MDCSTAT01701)를 쓰세요.
+    # (상폐종목도 조회되며, adjBasDd는 상장폐지일 기준을 권장. 상폐 후 이벤트가
+    #  없으므로 기준일을 오늘로 둬도 결과는 동일합니다.)
+    "delisted_stock_price": {
+        "bld": "dbms/MDC/STAT/issue/MDCSTAT23902",
+        "method": "csv",
+        "menu_id": "MDC0202",
+        "defaults": {
+            "isuCd2": "",
+            "tboxisuCd_finder_listdelisu0_0": "",
+            "codeNmisuCd_finder_listdelisu0_0": "",
+            "param1isuCd_finder_listdelisu0_0": "",
+            "share": "1",
+            "money": "1",
+            "csvxls_isNo": "false",
+        },
+        "post": ["read_csv_eucKR"],
+        "screen": "MDCSTAT23902 delisted stock price data",
+        "required": ["isuCd", "strtDd", "endDd"],
+    },
+    "delisted_stock_price_json": {
+        "bld": "dbms/MDC/STAT/issue/MDCSTAT23902",
+        "method": "json",
+        "menu_id": "MDC0202",
+        "defaults": {
+            "isuCd2": "",
+            "tboxisuCd_finder_listdelisu0_0": "",
+            "codeNmisuCd_finder_listdelisu0_0": "",
+            "param1isuCd_finder_listdelisu0_0": "",
+            "share": "1",
+            "money": "1",
+            "csvxls_isNo": "false",
+        },
+        "post": ["json_output_to_df"],
+        "screen": "MDCSTAT23902 delisted stock price data (JSON)",
+        "required": ["isuCd", "strtDd", "endDd"],
     },
     "new_listing": {
         "bld": "dbms/MDC/STAT/issue/MDCSTAT20001",
@@ -182,6 +264,8 @@ ENDPOINTS = {
             "codeNmisuCd_finder_stkisu0_0": "",
             "param1isuCd_finder_stkisu0_0": "ALL",
             "KNX": "KNX",
+            # KRX 화면의 "수정주가 적용" 체크 값입니다.
+            # fetch(..., adjusted_price=False)로 호출하면 client에서 제거합니다.
             "inqCondTpCd": "Y",
             "share": "1",
             "money": "1",

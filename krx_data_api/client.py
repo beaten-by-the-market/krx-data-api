@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any, Callable, Optional
 
 import pandas as pd
@@ -39,6 +40,51 @@ _POST_PROCESSORS: dict[str, Callable[..., Any]] = {
 }
 
 
+def _normalize_request_params(name: str, params: dict[str, Any]) -> dict[str, Any]:
+    """사용자 친화 옵션을 KRX 원시 파라미터로 변환합니다."""
+    normalized = dict(params)
+
+    if name in {"offering_price_change_rate", "offering_price_change_rate_json"}:
+        adjusted_price = normalized.pop("adjusted_price", None)
+        if adjusted_price is not None:
+            if not isinstance(adjusted_price, bool):
+                raise KRXFetchError(
+                    "adjusted_price must be a bool: True for 수정주가, "
+                    "False for 보통주가."
+                )
+            if adjusted_price:
+                # KRX 화면의 "수정주가 적용" 체크 값입니다.
+                normalized["inqCondTpCd"] = "Y"
+            else:
+                # 보통주가(미수정 주가)는 inqCondTpCd를 아예 보내지 않습니다.
+                normalized["inqCondTpCd"] = None
+
+    if name == "individual_price_trend":
+        adjusted_price = normalized.pop("adjusted_price", None)
+        if adjusted_price is not None:
+            if not isinstance(adjusted_price, bool):
+                raise KRXFetchError(
+                    "adjusted_price must be a bool: True for 수정주가, "
+                    "False for 원주가."
+                )
+            if adjusted_price:
+                # 수정주가: 화면의 "수정주가" 라디오 (adjStkPrc_check=Y, adjStkPrc=2).
+                normalized["adjStkPrc_check"] = "Y"
+                normalized["adjStkPrc"] = "2"
+            else:
+                # 원주가: adjStkPrc_check는 보내지 않고 adjStkPrc=1.
+                normalized["adjStkPrc_check"] = None
+                normalized["adjStkPrc"] = "1"
+        # 수정주가 기준일(adjBasDd)을 지정하지 않으면 오늘 날짜로 맞춥니다.
+        # 호출자가 adjBasDd=... 로 원하는 기준일을 넘기면 그 값을 씁니다.
+        if normalized.get("adjBasDd") is None:
+            normalized["adjBasDd"] = datetime.today().strftime("%Y%m%d")
+
+    # None은 "이 파라미터를 보내지 않음"으로 처리합니다.
+    # 기본값에 들어 있는 선택 파라미터를 호출자가 제거할 때 필요합니다.
+    return {key: value for key, value in normalized.items() if value is not None}
+
+
 def register_post_processor(name: str, func: Callable[..., Any]) -> None:
     """외부에서 커스텀 후처리를 추가하고 싶을 때."""
     _POST_PROCESSORS[name] = func
@@ -64,14 +110,17 @@ def fetch(
     session : 재사용할 requests.Session. None이면 매 호출마다 새 세션.
     post : 카탈로그의 post를 override하고 싶을 때 (보통 불필요)
     auth : True면 get_krx_auth()의 로그인된 세션을 사용 (보호 엔드포인트용)
-    **params : bld에 전달할 추가/오버라이드 파라미터 (defaults에 머지됨)
+    **params : bld에 전달할 추가/오버라이드 파라미터 (defaults에 머지됨).
+        값이 None이면 해당 파라미터를 전송하지 않습니다.
+        offering_price_change_rate 계열과 individual_price_trend는
+        adjusted_price=True(수정주가)/False(원주가)도 지원합니다.
     """
     spec = endpoints.get(name)
     bld = spec["bld"]
     method = method or spec["method"]
     menu_id = menu_id or spec["menu_id"]
 
-    merged = {**spec.get("defaults", {}), **params}
+    merged = _normalize_request_params(name, {**spec.get("defaults", {}), **params})
 
     missing = [k for k in spec.get("required", []) if k not in merged]
     if missing:

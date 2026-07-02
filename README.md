@@ -56,11 +56,28 @@ df = fetch("all_stock_price", trdDd="20260701")
 df_csv = fetch("all_stock_price_csv", trdDd="20260701")
 
 # 개별종목 시세추이: 기간형 CSV
+# 기본은 수정주가이며, 수정주가 기준일(adjBasDd)은 지정하지 않으면 오늘 날짜입니다.
 df = fetch(
     "individual_price_trend",
     isuCd="KR7005930003",
     strtDd="20250101",
     endDd="20260101",
+)
+# 원주가(비수정)로 조회하려면 adjusted_price=False.
+df_raw = fetch(
+    "individual_price_trend",
+    isuCd="KR7005930003",
+    strtDd="20250101",
+    endDd="20260101",
+    adjusted_price=False,
+)
+# 수정주가 기준일을 특정 시점으로 고정하려면 adjBasDd 지정.
+df_adj_base = fetch(
+    "individual_price_trend",
+    isuCd="KR7005930003",
+    strtDd="20250101",
+    endDd="20260101",
+    adjBasDd="20260101",
 )
 
 # 투자자별 거래실적(개별종목): 기간형 CSV 기본, JSON 보조
@@ -79,9 +96,57 @@ df_json = fetch(
     endDd="20260630",
 )
 
+# 투자자별 거래실적(개별종목) "일별추이": 날짜가 행, 투자자 유형이 열.
+# askBid=1 매수 / 2 매도 / 3 순매수(기본), trdVolVal=1 거래량 / 2 거래대금(기본)
+df_daily = fetch(
+    "investor_trading_individual_daily",
+    isuCd="KR7005930003",
+    strtDd="20260625",
+    endDd="20260701",
+)                                  # 기본: 순매수 거래대금
+df_daily_buy = fetch(
+    "investor_trading_individual_daily",
+    isuCd="KR7005930003",
+    strtDd="20260625",
+    endDd="20260701",
+    askBid="1",                    # 매수
+)
+df_daily_json = fetch(
+    "investor_trading_individual_daily_json",
+    isuCd="KR7005930003",
+    strtDd="20260625",
+    endDd="20260701",
+)
+
 # 상장폐지종목: 긴 기간은 CSV 기본
 df = fetch("delisted", strtDd="20240101", endDd="20260701")
 df_json = fetch("delisted_json", strtDd="20260624", endDd="20260701")
+
+# 상장폐지종목 시세: CSV 기본, JSON 보조
+# 주의: 이 화면(MDCSTAT23902)은 "원주가"만 제공합니다 (수정주가 옵션 없음).
+df = fetch(
+    "delisted_stock_price",
+    isuCd="KR7164060006",
+    strtDd="20231023",
+    endDd="20241022",
+)
+df_json = fetch(
+    "delisted_stock_price_json",
+    isuCd="KR7164060006",
+    strtDd="20231023",
+    endDd="20241022",
+)
+
+# 상폐종목의 "수정주가"가 필요하면 individual_price_trend를 사용하세요.
+# 상폐종목도 조회되며, 기준일(adjBasDd)은 상장폐지일로 주는 게 정석입니다.
+# (상폐 후에는 이벤트가 없어 기준일을 오늘로 둬도 결과는 동일합니다.)
+df_adj = fetch(
+    "individual_price_trend",
+    isuCd="KR7164060006",   # 이루다 (상폐 2024-10-22)
+    strtDd="20200806",
+    endDd="20241022",
+    adjBasDd="20241022",    # 상장폐지일 기준
+)
 
 # 신규상장종목 현황: 긴 기간은 CSV 기본
 df = fetch("new_listing", strtDd="20240101", endDd="20260701")
@@ -90,6 +155,24 @@ df_json = fetch("new_listing_json", strtDd="20260401", endDd="20260701")
 # 공모가대비 등락률: 긴 기간은 CSV 기본
 df = fetch("offering_price_change_rate", strtDd="20240101", endDd="20260701")
 df_json = fetch("offering_price_change_rate_json", strtDd="20260401", endDd="20260701")
+
+# 공모가대비 등락률: 기존 엔드포인트에서 코스닥 only CSV 옵션 지정
+# 보통주가(미수정 주가) 버전은 inqCondTpCd를 보내지 않고,
+# 수정주가 적용 버전은 KRX 화면 체크 값인 inqCondTpCd="Y"를 보냅니다.
+df_kosdaq_common = fetch(
+    "offering_price_change_rate",
+    mktId="KSQ",
+    adjusted_price=False,
+    strtDd="20260402",
+    endDd="20260702",
+)
+df_kosdaq_adjusted = fetch(
+    "offering_price_change_rate",
+    mktId="KSQ",
+    adjusted_price=True,
+    strtDd="20260402",
+    endDd="20260702",
+)
 
 # 변동성완화장치 발동종목 현황: JSON 기본, CSV 보조
 df = fetch("vi_triggered", strtDd="20260701", endDd="20260701")
@@ -136,8 +219,12 @@ df = pd.read_csv(BytesIO(raw), encoding="EUC-KR")
 | `individual_price_trend` | `MDCSTAT01701` | 12003 개별종목시세추이 | CSV |
 | `investor_trading_individual` | `MDCSTAT02301` | 12009 투자자별 거래실적(개별종목) | CSV |
 | `investor_trading_individual_json` | `MDCSTAT02301` | 12009 투자자별 거래실적(개별종목) | JSON |
+| `investor_trading_individual_daily` | `MDCSTAT02303` | 12009 투자자별 거래실적(개별종목) 일별추이 | CSV |
+| `investor_trading_individual_daily_json` | `MDCSTAT02303` | 12009 투자자별 거래실적(개별종목) 일별추이 | JSON |
 | `delisted` | `MDCSTAT23801` | 20037 상장폐지종목 현황 | CSV |
 | `delisted_json` | `MDCSTAT23801` | 20037 상장폐지종목 현황 | JSON |
+| `delisted_stock_price` | `MDCSTAT23902` | Delisted stock price data | CSV |
+| `delisted_stock_price_json` | `MDCSTAT23902` | Delisted stock price data | JSON |
 | `new_listing` | `MDCSTAT20001` | 20001 신규상장종목 현황 | CSV |
 | `new_listing_json` | `MDCSTAT20001` | 20001 신규상장종목 현황 | JSON |
 | `offering_price_change_rate` | `MDCSTAT20201` | 20003 공모가대비 등락률 | CSV |
@@ -156,7 +243,7 @@ df = pd.read_csv(BytesIO(raw), encoding="EUC-KR")
 | `equity_index` | `MDCSTAT00301` | 지수 시세추이 | CSV |
 
 ## 프로젝트 구조
-
+_
 ```text
 krx_data_api/
 ├── __init__.py        공개 API re-export

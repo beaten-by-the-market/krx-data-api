@@ -98,6 +98,8 @@ df = fetch("supervised")
 | `dbms/MDC/STAT/standard/MDCSTAT01701` | 12003 | 개별종목시세추이 | `individual_price_trend` |
 | `dbms/MDC/STAT/standard/MDCSTAT02301` | 12009 | 투자자별 거래실적(개별종목) | `investor_trading_individual` |
 | `dbms/MDC/STAT/standard/MDCSTAT02301` | 12009 | 투자자별 거래실적(개별종목)(JSON) | `investor_trading_individual_json` |
+| `dbms/MDC/STAT/standard/MDCSTAT02303` | 12009 | 투자자별 거래실적(개별종목) 일별추이 | `investor_trading_individual_daily` |
+| `dbms/MDC/STAT/standard/MDCSTAT02303` | 12009 | 투자자별 거래실적(개별종목) 일별추이(JSON) | `investor_trading_individual_daily_json` |
 | `dbms/MDC/STAT/issue/MDCSTAT23801` | 20037 | 상장폐지종목 현황 | `delisted` |
 | `dbms/MDC/STAT/issue/MDCSTAT23801` | 20037 | 상장폐지종목 현황(JSON) | `delisted_json` |
 | `dbms/MDC/STAT/issue/MDCSTAT20001` | 20001 | 신규상장종목 현황 | `new_listing` |
