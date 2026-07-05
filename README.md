@@ -240,6 +240,8 @@ df = pd.read_csv(BytesIO(raw), encoding="EUC-KR")
 | `ipo_price_return` | `MDCSTAT24401` | 20043 공모가 대비 주가수익률 | JSON |
 | `listed_bonds` | `MDCSTAT10801` | 14011 상장채권 상세검색 | JSON |
 | `listed_bonds_csv` | `MDCSTAT10801` | 14011 상장채권 상세검색 | CSV |
+| `etf_price_trend` | `MDCSTAT04501` | 개별종목 시세추이 | CSV |
+| `etf_all_info` | `MDCSTAT04601` | 전종목 기본정보 | CSV |
 | `equity_index` | `MDCSTAT00301` | 지수 시세추이 | CSV |
 
 ## 프로젝트 구조

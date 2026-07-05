@@ -58,6 +58,8 @@ def test_catalog_lists_registered_endpoints():
         "ipo_price_return",
         "listed_bonds",
         "listed_bonds_csv",
+        "etf_price_trend",
+        "etf_all_info",
         "equity_index",
     ):
         assert required in names

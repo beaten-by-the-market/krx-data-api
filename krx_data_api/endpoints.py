@@ -435,6 +435,38 @@ ENDPOINTS = {
         "post": ["read_csv_eucKR"],
         "screen": "14011 상장채권 상세검색 (CSV)",
     },
+    # 증권상품(ETF 등) 개별종목 시세추이. menuId MDC0201030103.
+    # finder는 secuprodisu(증권상품) 계열. 캡처 예시: ARIRANG 200(KR7152100004).
+    # CSV는 finder 텍스트 필드를 빈 값으로 함께 보내야 안전합니다(호출자는 isuCd만 지정).
+    "etf_price_trend": {
+        "bld": "dbms/MDC/STAT/standard/MDCSTAT04501",
+        "method": "csv",
+        "menu_id": "MDC0201030103",
+        "defaults": {
+            "tboxisuCd_finder_secuprodisu1_0": "",
+            "codeNmisuCd_finder_secuprodisu1_0": "",
+            "param1isuCd_finder_secuprodisu1_0": "",
+            "share": "1",
+            "money": "1",
+            "csvxls_isNo": "false",
+        },
+        "post": ["read_csv_eucKR"],
+        "screen": "개별종목 시세추이 (MDCSTAT04501)",
+        "required": ["isuCd", "isuCd2", "strtDd", "endDd"],
+    },
+    # 증권상품(ETF 등) 전종목 스냅샷. menuId MDC0201030104.
+    # 캡처 요청은 종목·날짜 없이 share=1만 전송 → 전종목 기본정보(날짜 입력 없음).
+    "etf_all_info": {
+        "bld": "dbms/MDC/STAT/standard/MDCSTAT04601",
+        "method": "csv",
+        "menu_id": "MDC0201030104",
+        "defaults": {
+            "share": "1",
+            "csvxls_isNo": "false",
+        },
+        "post": ["read_csv_eucKR"],
+        "screen": "전종목 기본정보 (MDCSTAT04601)",
+    },
     "equity_index": {
         "bld": "dbms/MDC/STAT/standard/MDCSTAT00301",
         "method": "csv",
