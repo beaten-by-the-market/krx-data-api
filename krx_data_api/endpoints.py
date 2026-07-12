@@ -398,6 +398,36 @@ ENDPOINTS = {
         "screen": "20023 변동성완화장치 발동종목 현황 (CSV)",
         "required": ["strtDd", "endDd"],
     },
+    # 개별종목의 매매거래정지 이력(정지일/재개일/정지 직전 최종매매일 시세).
+    # 종목 지정이 필수입니다 — isuCd를 비우거나 ALL로 보내면 항상 0행이 옵니다.
+    # 조회기간은 2년까지만 허용됩니다 (초과하면 KRX가 'INVALIDPERIOD2'로 400).
+    "trading_halt": {
+        "bld": "dbms/MDC/STAT/issue/MDCSTAT21301",
+        "method": "json",
+        "menu_id": "MDC0202",
+        "defaults": {
+            "param1isuCd_finder_stkisu0_3": "ALL",
+        },
+        "post": ["json_output_to_df"],
+        "screen": "매매거래정지 종목 현황 (MDCSTAT21301)",
+        "required": ["isuCd", "isuCd2", "strtDd", "endDd"],
+    },
+    # CSV는 JSON보다 컬럼이 적습니다(번호/종목코드/종목명/시장구분/정지일/재개일).
+    # 정지 직전 시세까지 필요하면 JSON(trading_halt)을 쓰세요.
+    "trading_halt_csv": {
+        "bld": "dbms/MDC/STAT/issue/MDCSTAT21301",
+        "method": "csv",
+        "menu_id": "MDC0202",
+        "defaults": {
+            "tboxisuCd_finder_stkisu0_3": "",
+            "codeNmisuCd_finder_stkisu0_3": "",
+            "param1isuCd_finder_stkisu0_3": "ALL",
+            "csvxls_isNo": "true",
+        },
+        "post": ["read_csv_eucKR"],
+        "screen": "매매거래정지 종목 현황 (MDCSTAT21301, CSV)",
+        "required": ["isuCd", "isuCd2", "strtDd", "endDd"],
+    },
     "short_selling_individual": {
         "bld": "dbms/MDC/STAT/srt/MDCSTAT30101",
         "method": "json",

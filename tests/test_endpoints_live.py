@@ -12,6 +12,7 @@ import pandas as pd
 import pytest
 
 from krx_data_api import client, fetch, list_endpoints
+from krx_data_api.exceptions import KRXFetchError
 
 pytestmark = pytest.mark.skipif(
     os.getenv("KRX_SKIP_LIVE") == "1", reason="KRX_SKIP_LIVE set"
@@ -53,6 +54,8 @@ def test_catalog_lists_registered_endpoints():
         "unfaithful_disclosure",
         "vi_triggered",
         "vi_triggered_csv",
+        "trading_halt",
+        "trading_halt_csv",
         "short_selling_individual",
         "listing_special",
         "ipo_price_return",
@@ -167,6 +170,40 @@ def test_vi_triggered_json():
     assert isinstance(df, pd.DataFrame)
     assert "VI_KIND_NM" in df.columns
     assert "VI_TG_TM" in df.columns
+
+
+def test_trading_halt_json():
+    # DH오토넥스(000300)는 2024-02-23 매매거래정지 이력이 있는 종목.
+    df = fetch(
+        "trading_halt",
+        isuCd="KR7000300004",
+        isuCd2="000300",
+        strtDd="20240101",
+        endDd="20251231",
+    )
+    assert isinstance(df, pd.DataFrame)
+    assert len(df) > 0
+    assert "TRD_HALT_DD" in df.columns
+    assert "RESUMP_DD" in df.columns
+    assert "LST_TRD_DD" in df.columns
+
+
+def test_trading_halt_csv():
+    df = fetch(
+        "trading_halt_csv",
+        isuCd="KR7000300004",
+        isuCd2="000300",
+        strtDd="20240101",
+        endDd="20251231",
+    )
+    assert isinstance(df, pd.DataFrame)
+    assert "정지일" in df.columns
+    assert "재개일" in df.columns
+
+
+def test_trading_halt_requires_issue():
+    with pytest.raises(KRXFetchError):
+        fetch("trading_halt", strtDd="20240101", endDd="20251231")
 
 
 def test_ipo_price_return_json():

@@ -180,6 +180,23 @@ df_csv = fetch("vi_triggered_csv", strtDd="20260701", endDd="20260701")
 
 # 개별종목 공매도 거래
 df = fetch("short_selling_individual", trdDd="20260701")
+
+# 매매거래정지 종목 현황: 종목 지정 필수, 조회기간 최대 2년
+# JSON은 정지 직전 최종매매일 시세(종가·거래량·시가총액)까지 포함합니다.
+df = fetch(
+    "trading_halt",
+    isuCd="KR7000300004",
+    isuCd2="000300",
+    strtDd="20240101",
+    endDd="20251231",
+)
+df_csv = fetch(
+    "trading_halt_csv",
+    isuCd="KR7000300004",
+    isuCd2="000300",
+    strtDd="20240101",
+    endDd="20251231",
+)
 ```
 
 목록과 상세 정보는 프로그래밍 방식으로 확인할 수 있습니다.
@@ -235,6 +252,8 @@ df = pd.read_csv(BytesIO(raw), encoding="EUC-KR")
 | `unfaithful_disclosure` | `MDCSTAT22001` | 20018 불성실공시법인 현황 | JSON |
 | `vi_triggered` | `MDCSTAT22401` | 20023 변동성완화장치 발동종목 현황 | JSON |
 | `vi_triggered_csv` | `MDCSTAT22401` | 20023 변동성완화장치 발동종목 현황 | CSV |
+| `trading_halt` | `MDCSTAT21301` | 매매거래정지 종목 현황 | JSON |
+| `trading_halt_csv` | `MDCSTAT21301` | 매매거래정지 종목 현황 | CSV |
 | `short_selling_individual` | `MDCSTAT30101` | 32001 개별종목 공매도 거래 | JSON |
 | `listing_special` | `MDCSTAT24401` | 상장특례 현황 | CSV |
 | `ipo_price_return` | `MDCSTAT24401` | 20043 공모가 대비 주가수익률 | JSON |
