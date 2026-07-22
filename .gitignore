@@ -6,3 +6,7 @@ __pycache__/
 *.egg-info/
 build/
 dist/
+
+# 관리종목 스크리너 스냅샷 캐시 (증분 수집물)
+data/
+*.snapshots.csv
