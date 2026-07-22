@@ -52,6 +52,24 @@ def _trailing_streak(pairs, thr_fn, want_below: bool) -> int:
     return run
 
 
+def _last_below_run_start(pairs, thr_fn):
+    """가장 최근의 '미달' 연속 run 시작일(카운트 시작일). 없으면 None. None(스킵)은 무시."""
+    run_start = None
+    last_start = None
+    in_run = False
+    for d, v in pairs:
+        if v is None:
+            continue
+        if v < thr_fn(d):
+            if not in_run:
+                run_start = d
+                in_run = True
+            last_start = run_start
+        else:
+            in_run = False
+    return last_start
+
+
 def stock_status_rows(
     cache_df: pd.DataFrame,
     universe: set,
@@ -188,6 +206,7 @@ def stock_status_rows(
                 "official": srt in off_set,
                 "official_design_date": official_dates.get(srt) if srt in off_set else None,
                 "estimated_effective": events[-1].effective_date if (designated and events) else None,
+                "count_start_date": _last_below_run_start(pairs, thr_fn),
                 "countdown": cd, "delisting": delisting,
             })
 
@@ -208,6 +227,7 @@ def build_dashboard_artifacts(
     *,
     supervised: Optional[pd.DataFrame] = None,
     admin_issue: Optional[pd.DataFrame] = None,
+    actions_by_code: Optional[dict] = None,
     generated_at: Optional[str] = None,
     series_codes: Optional[list] = None,
     series_top: int = 8,
@@ -279,6 +299,8 @@ def build_dashboard_artifacts(
                        "dates": dates,
                        "close": _vlist(close_w[std].values),
                        "mktcap": _vlist(cap_w[std].values)}
+        if actions_by_code and srt in actions_by_code:
+            series[srt]["actions"] = actions_by_code[srt]
 
     meta = {
         "as_of": dates[-1] if dates else None,

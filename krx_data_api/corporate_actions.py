@@ -84,7 +84,10 @@ def reverse_split_events(
             date = _norm_ymd(row.get("LIST_DT"))
             if ratio is None or date is None:
                 continue
-            events.append(
-                {"date": date, "ratio": ratio, "type": REVERSE_SPLIT_REASONS.get(rc, rc)}
-            )
+            events.append({
+                "date": date,                        # 변경상장일(LIST_DT)
+                "issue_date": _norm_ymd(row.get("ISSU_DT")),  # 발행일
+                "ratio": ratio,                      # old:new
+                "type": REVERSE_SPLIT_REASONS.get(rc, rc),
+            })
     return events
