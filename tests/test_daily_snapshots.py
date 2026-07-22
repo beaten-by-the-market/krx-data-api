@@ -128,4 +128,4 @@ def test_to_wide_pivot(tmp_path):
 
 def test_to_wide_rejects_bad_column():
     with pytest.raises(ValueError):
-        ds.to_wide(pd.DataFrame(), "거래량")
+        ds.to_wide(pd.DataFrame(), "거래대금")

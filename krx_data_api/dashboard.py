@@ -76,6 +76,8 @@ def stock_status_rows(
     cap_w = ds.to_wide(cache_df, "시가총액").reindex(index=close_w.index)
     dates = close_w.index.tolist()
     meta = scr._meta_by_code(cache_df)
+    vol_w = (ds.to_wide(cache_df, "거래량").reindex(index=close_w.index)
+             if "거래량" in cache_df.columns else None)
 
     rows = []
     counts = {"mktcap_designated": 0, "price_designated": 0, "approaching": 0,
@@ -92,6 +94,12 @@ def stock_status_rows(
             continue
         closes = _vlist(close_w[code].values)
         caps = _vlist(cap_w[code].values)
+        # 거래량 0(매매거래정지 등)인 날은 매매거래일 아님 → 스킵(None).
+        if vol_w is not None and code in vol_w.columns:
+            for i, vv in enumerate(vol_w[code].values):
+                if not pd.isna(vv) and int(vv) == 0:
+                    closes[i] = None
+                    caps[i] = None
         last_close = next((v for v in reversed(closes) if v is not None), None)
         last_cap = next((v for v in reversed(caps) if v is not None), None)
 
@@ -130,16 +138,25 @@ def stock_status_rows(
                 state = S_RELEASE_PENDING if suf >= release_pending_threshold else S_DESIGNATED
                 if suf > 0:
                     cd["to_release"] = sv.RELEASE_DAYS - suf
+                # 상폐 회복창(주가=제54조13호가 / 시총=제54조12호) 평가
+                eff = (events[-1].effective_date or dates[-1]) if events else dates[-1]
                 if reason == "price":
-                    eff = events[-1].effective_date or dates[-1]
                     rr = sv.evaluate_price_recovery_failure(dates, closes, eff)
-                    cd["to_delisting"] = max(sv.PRICE_DELIST_WINDOW_DAYS - rr.observed_days, 0)
-                    delisting = {"recovery_status": rr.status, "na": False, "da": False,
-                                 "observed": rr.observed_days}
-                    if rr.status in ("상폐확정", "조기상폐확정"):
-                        state = S_DELISTING_CONFIRMED
-                    elif state != S_RELEASE_PENDING:
-                        state = S_DELISTING_RISK
+                    window = sv.PRICE_DELIST_WINDOW_DAYS
+                    delisting = {"recovery_status": rr.status, "observed": rr.observed_days,
+                                 "reason": "주가"}
+                else:  # mktcap: 제54조12호(회복=기준이상 10연속 또는 누적30)
+                    rr = sv.evaluate_mktcap_recovery_failure(dates, caps, eff, thr_fn)
+                    window = sv.MKTCAP_DELIST_WINDOW_DAYS
+                    delisting = {"recovery_status": rr.status, "observed": rr.observed_days,
+                                 "recovered_by": rr.recovered_by, "reason": "시총"}
+                cd["to_delisting"] = max(window - rr.observed_days, 0)
+                if rr.status in ("상폐확정", "조기상폐확정"):
+                    state = S_DELISTING_CONFIRMED
+                    counts["delisting_risk"] += 1
+                elif state != S_RELEASE_PENDING and cd["to_delisting"] <= 15:
+                    # 회복창 15거래일 이하 남았는데 미회복 → 상폐 임박
+                    state = S_DELISTING_RISK
                     counts["delisting_risk"] += 1
                 (my_cap if reason == "mktcap" else my_price).add(srt)
                 counts["mktcap_designated" if reason == "mktcap" else "price_designated"] += 1

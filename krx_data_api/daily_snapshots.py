@@ -35,8 +35,10 @@ SNAPSHOT_COLUMNS = [
     "소속부",     # SECT_TP_NM (관리종목/SPAC 등 태그 참고용)
     "종가",       # TDD_CLSPRC (원, 무거래일엔 기준가격)
     "시가총액",   # MKTCAP (원)
+    "거래량",     # ACC_TRDVOL (주). 0이면 매매 없음(매매거래정지 등) → 미달 카운트 제외 신호
 ]
 _STR_COLS = ["일자", "단축코드", "표준코드"]
+_NUM_COLS = ["종가", "시가총액", "거래량"]
 
 
 def _parse_won(s: pd.Series) -> pd.Series:
@@ -91,6 +93,7 @@ def fetch_snapshot(trade_date: str, *, session=None) -> pd.DataFrame:
             "소속부": raw["SECT_TP_NM"].astype(str) if "SECT_TP_NM" in raw else "",
             "종가": _parse_won(raw["TDD_CLSPRC"]),
             "시가총액": _parse_won(raw["MKTCAP"]),
+            "거래량": _parse_won(raw["ACC_TRDVOL"]) if "ACC_TRDVOL" in raw else pd.NA,
         }
     )
     return out[SNAPSHOT_COLUMNS]
@@ -105,7 +108,7 @@ def load_cache(cache_path: str) -> pd.DataFrame:
         dtype={c: str for c in _STR_COLS},
         encoding="utf-8-sig",
     )
-    for c in ("종가", "시가총액"):
+    for c in _NUM_COLS:
         if c in df.columns:
             df[c] = pd.to_numeric(df[c], errors="coerce").astype("Int64")
     return df
@@ -175,11 +178,11 @@ def update_cache(
 def to_wide(cache_df: pd.DataFrame, value_col: str) -> pd.DataFrame:
     """롱 캐시를 일자(행)×표준코드(열) 매트릭스로 피벗한다.
 
-    value_col: "종가" 또는 "시가총액". 상장 전/후 결측은 NaN으로 남아
+    value_col: "종가"·"시가총액"·"거래량". 상장 전/후 결측은 NaN으로 남아
     상태기계에서 None(스킵)으로 처리된다. 인덱스(일자)는 오름차순.
     """
-    if value_col not in ("종가", "시가총액"):
-        raise ValueError("value_col must be '종가' or '시가총액'")
+    if value_col not in ("종가", "시가총액", "거래량"):
+        raise ValueError("value_col must be '종가', '시가총액', or '거래량'")
     wide = cache_df.pivot_table(
         index="일자", columns="표준코드", values=value_col, aggfunc="last"
     ).sort_index()

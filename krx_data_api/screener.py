@@ -219,6 +219,7 @@ def screen_market(
     designate_days: int = sv.DESIGNATE_DAYS,
     release_days: int = sv.RELEASE_DAYS,
     universe: Optional[set] = None,
+    exclude_zero_volume: bool = True,
     exclude_spac: bool = True,
     exclude_preferred: bool = True,
     exclude_reit: bool = True,
@@ -237,6 +238,9 @@ def screen_market(
         종가는 주가 카운트에서 제외. None이면 제한 없음.
     mktcap_count_start : 시총 미달 카운트 시작 제한(기본 None=연속). 시총은 부칙상
         종전부터 연속 산정하되 기준만 시기별이라 보통 None.
+    exclude_zero_volume : 거래량 0인 날(매매거래정지 등)은 그 종목 매매거래일이 아니므로
+        미달 일수 카운트에서 제외(스킵). 규정이 '매매거래일' 기준이라 필요. 캐시에
+        '거래량' 컬럼이 있어야 동작(없으면 무시).
 
     Returns
     -------
@@ -258,6 +262,9 @@ def screen_market(
     cap_wide = ds.to_wide(cache_df, "시가총액").reindex(index=close_wide.index)
     dates = close_wide.index.tolist()
     meta = _meta_by_code(cache_df)
+    # 거래량 0(매매 없음/거래정지) 마스크: 해당 종목·날짜는 카운트에서 스킵.
+    vol_wide = (ds.to_wide(cache_df, "거래량").reindex(index=close_wide.index)
+                if exclude_zero_volume and "거래량" in cache_df.columns else None)
 
     rows = []
     for code in close_wide.columns:
@@ -284,6 +291,13 @@ def screen_market(
         closes = _series_none(close_wide[code].values)
         caps = (_series_none(cap_wide[code].values)
                 if code in cap_wide.columns else [None] * len(dates))
+        # 거래량 0인 날은 매매거래일이 아니므로 두 사유 모두 스킵(None)으로.
+        if vol_wide is not None and code in vol_wide.columns:
+            vols = vol_wide[code].values
+            for i, v in enumerate(vols):
+                if not pd.isna(v) and int(v) == 0:
+                    closes[i] = None
+                    caps[i] = None
 
         events_by_reason = []
         if do_mktcap:

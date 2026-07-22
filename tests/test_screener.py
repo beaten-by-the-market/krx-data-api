@@ -6,9 +6,9 @@ import pandas as pd
 from krx_data_api import screener as scr
 
 
-def _long_cache(code, dates, closes, caps, name="테스트", srt="000010", mkt="KOSDAQ"):
+def _long_cache(code, dates, closes, caps, name="테스트", srt="000010", mkt="KOSDAQ", vols=None):
     """단일 종목 롱 캐시 생성."""
-    return pd.DataFrame(
+    df = pd.DataFrame(
         {
             "일자": dates,
             "단축코드": srt,
@@ -20,6 +20,9 @@ def _long_cache(code, dates, closes, caps, name="테스트", srt="000010", mkt="
             "시가총액": pd.array(caps, dtype="Int64"),
         }
     )
+    if vols is not None:
+        df["거래량"] = pd.array(vols, dtype="Int64")
+    return df
 
 
 def test_screen_market_price_designation():
@@ -127,6 +130,20 @@ def test_mktcap_period_transition_across_launch():
     assert len(cap) == 1
     # 7월 1일부터 30거래일째에 지정 → 판정일은 post의 30번째
     assert cap.iloc[0]["판정일"] == post[29]
+
+
+def test_zero_volume_days_excluded_from_count():
+    # 시총 100억(<150 기준)으로 40일 미달이지만, 거래량 0인 정지일 15일을 빼면
+    # 실제 매매거래일 25일뿐 → 미지정. exclude_zero_volume=False면 지정.
+    dates = [f"202606{d:02d}" for d in range(1, 41)]  # 40일(6월, 150억 기준)
+    closes = [500] * 40
+    caps = [10_000_000_000] * 40  # 100억 < 150억
+    vols = [0] * 15 + [1000] * 25  # 앞 15일 거래정지(거래량 0)
+    cache = _long_cache("KR7000010000", dates, closes, caps, srt="000100", vols=vols)
+    ev_skip = scr.screen_market(cache, price_count_start=None)  # 기본 제외 ON
+    assert ev_skip[ev_skip["사유"] == "시가총액"].empty  # 25 매매거래일뿐 → 미지정
+    ev_all = scr.screen_market(cache, price_count_start=None, exclude_zero_volume=False)
+    assert not ev_all[ev_all["사유"] == "시가총액"].empty  # 40일 다 세면 지정
 
 
 def test_konex_excluded_entirely():

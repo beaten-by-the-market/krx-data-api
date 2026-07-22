@@ -32,6 +32,9 @@ RELEASE_DAYS = 45                  # 해제: 연속 이상 매매거래일 수
 PRICE_DELIST_WINDOW_DAYS = 90      # 주가미달 상폐(가): 회복 유예 매매거래일 수
 REVERSE_SPLIT_RATIO_CAP = 10.0     # 주가미달 상폐(다): 누적 병합/감자 비율(old:new) 상한(초과 시 상폐)
 REVERSE_SPLIT_LOOKBACK_DAYS = 365  # 주가미달 상폐(나): 과거 이력 조회 기간(달력 1년)
+MKTCAP_DELIST_WINDOW_DAYS = 90     # 시총미달 상폐(제54조12호): 회복 유예 매매거래일 수
+MKTCAP_RECOVERY_CONSEC_DAYS = 10   # 시총미달 상폐 회복 '가': 기준 이상 연속 일수
+MKTCAP_RECOVERY_CUMUL_DAYS = 30    # 시총미달 상폐 회복 '나': 기준 이상 누적 일수
 
 DESIGNATE = "designate"
 RELEASE = "release"
@@ -301,6 +304,100 @@ def evaluate_price_recovery_failure(
         status=status,
         max_recovery_run=max_run,
         recovered_on=recovered_on,
+        window_start=window_start,
+        window_end=window_end,
+        observed_days=observed_days,
+    )
+
+
+@dataclass(frozen=True)
+class MktcapRecoveryResult:
+    """제54조①12호(시총미달 상폐) 판정 결과.
+
+    status         : RECOVERED / DELIST_CONFIRMED / DELIST_EARLY / WATCHING / NO_DATA
+    max_consec     : 창 내 최장 연속 '이상'(시총>=기준) 거래일 수
+    cumulative     : 창 내 '이상' 누적 거래일 수
+    recovered_by   : '가'(연속 consec) 또는 '나'(누적 cumul) 최초 충족 사유('가'/'나'/None)
+    window_start / window_end / observed_days : 창 정보
+    """
+
+    status: str
+    max_consec: int
+    cumulative: int
+    recovered_by: Any
+    window_start: Any
+    window_end: Any
+    observed_days: int
+
+
+def evaluate_mktcap_recovery_failure(
+    dates: Sequence[Any],
+    caps: Sequence[Optional[float]],
+    designation_date: Any,
+    threshold,
+    *,
+    window_days: int = MKTCAP_DELIST_WINDOW_DAYS,
+    consec_days: int = MKTCAP_RECOVERY_CONSEC_DAYS,
+    cumul_days: int = MKTCAP_RECOVERY_CUMUL_DAYS,
+) -> MktcapRecoveryResult:
+    """규정 제54조①13호... 아니라 제54조①12호: 시가총액 미달로 관리종목 지정된 후
+    window_days(90) 매매거래일 동안 시가총액이 다음 두 회복조건 중 **하나도** 충족
+    못하면 상장폐지. (하나라도 충족하면 상폐 아님)
+
+    가. 기준액 이상인 상태가 consec_days(10) 이상 **연속**
+    나. 기준액 이상인 일수가 cumul_days(30) 이상 **누적**
+
+    threshold : 기준액(scalar) 또는 날짜별 함수 f(date)->기준액(부칙 시기별 기준용).
+    caps : 시가총액 시계열(None=매매거래일 아님/스킵).
+    designation_date : 시총미달 지정일(dates와 같은 형식).
+    """
+    thr_fn = threshold if callable(threshold) else (lambda _d: threshold)
+    window = [
+        (d, c) for d, c in zip(dates, caps) if d >= designation_date
+    ][:window_days]
+    if not window:
+        return MktcapRecoveryResult(NO_DATA, 0, 0, None, None, None, 0)
+
+    window_start = window[0][0]
+    observed_days = len(window)
+    window_end = window[-1][0] if observed_days >= window_days else None
+
+    consec = 0
+    max_consec = 0
+    cumulative = 0
+    trailing_consec = 0
+    recovered_by = None
+    for d, c in window:
+        if c is not None and c >= thr_fn(d):  # 기준 이상
+            consec += 1
+            cumulative += 1
+            if consec > max_consec:
+                max_consec = consec
+            if recovered_by is None:
+                if consec >= consec_days:
+                    recovered_by = "가"
+                elif cumulative >= cumul_days:
+                    recovered_by = "나"
+        else:
+            consec = 0
+        trailing_consec = consec
+
+    if recovered_by is not None:
+        status = RECOVERED
+    elif observed_days >= window_days:
+        status = DELIST_CONFIRMED
+    else:
+        remaining = window_days - observed_days
+        # 남은 기간으로 '가'(연속 consec) 또는 '나'(누적 cumul) 달성 가능한가?
+        can_consec = (trailing_consec + remaining) >= consec_days or remaining >= consec_days
+        can_cumul = (cumulative + remaining) >= cumul_days
+        status = WATCHING if (can_consec or can_cumul) else DELIST_EARLY
+
+    return MktcapRecoveryResult(
+        status=status,
+        max_consec=max_consec,
+        cumulative=cumulative,
+        recovered_by=recovered_by,
         window_start=window_start,
         window_end=window_end,
         observed_days=observed_days,

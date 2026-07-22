@@ -17,6 +17,7 @@ from krx_data_api.supervision import (
     SUPERVISED,
     WATCHING,
     SupervisionEvent,
+    evaluate_mktcap_recovery_failure,
     evaluate_price_recovery_failure,
     evaluate_reverse_split_delisting,
     evaluate_stock,
@@ -346,3 +347,64 @@ def test_open_window_when_end_none():
     res = evaluate_reverse_split_delisting("20260601", None, events)
     assert res.da is True
     assert res.within_window == 1
+
+
+# ------------------------------------------ 제54조12호: 시총미달 상폐(회복 실패)
+
+THR2 = 20_000_000_000  # 200억
+
+
+def test_mktcap_recovery_via_consecutive_10():
+    # 지정 후 10거래일 연속 기준 이상 → 회복(가)
+    dates = _dates(90)
+    caps = [1] * 20 + [THR2] * 10 + [1] * 60  # 21~30일 연속 이상
+    res = evaluate_mktcap_recovery_failure(dates, caps, 1, THR2)
+    assert res.status == RECOVERED
+    assert res.recovered_by == "가"
+
+
+def test_mktcap_recovery_via_cumulative_30():
+    # 연속은 10 안 되지만(9씩) 누적 이상이 30일 → 회복(나)
+    dates = _dates(90)
+    block = [THR2] * 9 + [1]  # 9 이상 + 1 미달, 연속 최대 9
+    caps = (block * 4)[:90]   # 이상 누적 36일, 연속 최대 9
+    res = evaluate_mktcap_recovery_failure(dates, caps, 1, THR2)
+    assert res.status == RECOVERED
+    assert res.recovered_by == "나"
+    assert res.max_consec < 10
+
+
+def test_mktcap_delist_confirmed_no_recovery():
+    # 90일 다 지났는데 이상이 연속10·누적30 둘 다 미달 → 상폐확정
+    dates = _dates(90)
+    # 이상을 8일마다 1번씩만(누적 ~11, 연속 1) → 회복 실패
+    caps = [THR2 if (i % 8 == 0) else 1 for i in range(90)]
+    res = evaluate_mktcap_recovery_failure(dates, caps, 1, THR2)
+    assert res.status == DELIST_CONFIRMED
+    assert res.max_consec < 10 and res.cumulative < 30
+
+
+def test_mktcap_watching_before_window_end():
+    dates = _dates(20)
+    caps = [1] * 20  # 계속 미달, 창 미경과
+    res = evaluate_mktcap_recovery_failure(dates, caps, 1, THR2)
+    assert res.status == WATCHING
+
+
+def test_mktcap_early_delist_impossible():
+    # 82거래일 지남, 이상 0 → 남은 8일로는 연속10·누적30 불가 → 조기확정
+    dates = _dates(82)
+    caps = [1] * 82
+    res = evaluate_mktcap_recovery_failure(dates, caps, 1, THR2)
+    assert res.status == DELIST_EARLY
+
+
+def test_mktcap_recovery_period_threshold_callable():
+    # 날짜별 기준(callable) 지원: 후반 기준이 높아 이상 판정 달라짐
+    dates = list(range(1, 41))
+    caps = [25_000_000_000] * 40  # 250억
+    thr = lambda d: 20_000_000_000 if d <= 20 else 30_000_000_000  # 200억→300억
+    # 전반(<=20)은 250>=200 이상, 후반(>20)은 250<300 미달
+    res = evaluate_mktcap_recovery_failure(dates, caps, 1, thr, window_days=40)
+    # 전반 20일 연속 이상 → '가'(10연속) 이미 충족
+    assert res.status == RECOVERED and res.recovered_by == "가"
