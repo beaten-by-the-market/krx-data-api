@@ -29,6 +29,7 @@ S_DESIGNATED = "designated"
 S_RELEASE_PENDING = "release_pending"
 S_DELISTING_RISK = "delisting_risk"
 S_DELISTING_CONFIRMED = "delisting_confirmed"
+S_BELOW = "below"          # 현재 미달이나 아직 임박(streak<approach) 전
 S_NORMAL = "normal"
 
 DEFAULT_APPROACH = 20        # 미달 연속 이 값 이상이면 '임박'
@@ -99,7 +100,7 @@ def stock_status_rows(
 
     rows = []
     counts = {"mktcap_designated": 0, "price_designated": 0, "approaching": 0,
-              "release_pending": 0, "delisting_risk": 0, "imminent_D5": 0}
+              "release_pending": 0, "delisting_risk": 0, "imminent_D5": 0, "below": 0}
     my_cap, my_price = set(), set()
 
     for code in close_w.columns:
@@ -190,6 +191,11 @@ def stock_status_rows(
                     counts["approaching"] += 1
                     if cd["to_designation"] <= 5:
                         counts["imminent_D5"] += 1
+                elif deff >= 1:
+                    # 현재 미달이나 아직 임박 전(streak < approach_threshold)
+                    state = S_BELOW
+                    cd["to_designation"] = sv.DESIGNATE_DAYS - deff
+                    counts["below"] += 1
                 else:
                     state = S_NORMAL
 
