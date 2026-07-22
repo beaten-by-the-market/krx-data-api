@@ -80,6 +80,33 @@ def test_price_not_counted_before_launch():
     assert [r for r in art["rows"] if r["reason"] == "price"] == []
 
 
+def test_kind_admin_issue_designation_date():
+    # KIND admin_issue(종목명·지정일)로 지정 종목에 kind_design_date 부착(종목명 매칭)
+    dates = [f"202606{d:02d}" for d in range(1, 31)]
+    rows = _one_stock("KR7000010000", "000100", "가가종목", "KOSDAQ",
+                      dates, [5000]*30, [10_000_000_000]*30)
+    admin = pd.DataFrame({
+        "종목명": ["가가종목", "딴종목"],
+        "지정일": ["2026/03/24", "2026/01/02"],
+        "지정사유": ["시가총액 미달", "감사의견"],
+    })
+    art = dash.build_dashboard_artifacts(_cache(rows), {"000100"}, admin_issue=admin)
+    r = [x for x in art["rows"] if x["reason"] == "mktcap"][0]
+    assert r["kind_design_date"] == "20260324"  # 종전 지정분 원본 지정일
+
+
+def test_kind_admin_issue_none_when_not_designated():
+    # 임박(미지정) 종목은 kind_design_date=None
+    dates = [f"202606{d:02d}" for d in range(1, 26)]  # 25일 → 임박
+    rows = _one_stock("KR7000010000", "000100", "가가종목", "KOSDAQ",
+                      dates, [5000]*25, [10_000_000_000]*25)
+    admin = pd.DataFrame({"종목명": ["가가종목"], "지정일": ["2026/03/24"], "지정사유": ["x"]})
+    art = dash.build_dashboard_artifacts(_cache(rows), {"000100"}, admin_issue=admin)
+    r = [x for x in art["rows"] if x["reason"] == "mktcap"][0]
+    assert r["state"] == "approaching"
+    assert r["kind_design_date"] is None
+
+
 def test_out_json_roundtrip(tmp_path):
     dates = [f"202606{d:02d}" for d in range(1, 31)]
     rows = _one_stock("KR7000010000", "000100", "가가", "KOSDAQ",

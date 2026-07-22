@@ -187,6 +187,7 @@ def build_dashboard_artifacts(
     universe: set,
     *,
     supervised: Optional[pd.DataFrame] = None,
+    admin_issue: Optional[pd.DataFrame] = None,
     generated_at: Optional[str] = None,
     series_codes: Optional[list] = None,
     series_top: int = 8,
@@ -197,6 +198,9 @@ def build_dashboard_artifacts(
 
     supervised : KRX 관리종목현황 DataFrame(fetch("supervised")). 주면 공식 대조.
         None이면 official_available=False로 추정만.
+    admin_issue : KIND 관리종목 지정목록 DataFrame(종목명·지정일·지정사유,
+        krx_kind_data_api.fetch("admin_issue")). 주면 지정 종목 행에 KIND 지정일
+        (`kind_design_date`)을 종목명 매칭으로 붙인다.
     series_codes : 드릴다운 시계열을 넣을 단축코드 목록. 없으면 임박·지정 상위 series_top.
     out_json : 주면 전체 artifacts를 하나의 JSON으로 저장(대시보드 embed용).
     """
@@ -210,6 +214,20 @@ def build_dashboard_artifacts(
         **row_kwargs,
     )
     rows, counts, my_cap, my_price = res["rows"], res["counts"], res["my_cap"], res["my_price"]
+
+    # KIND 관리종목 지정일(종목명 매칭). admin_issue는 코드가 없어 종목명으로 조인한다.
+    kind_map = {}
+    if admin_issue is not None and "종목명" in admin_issue.columns and "지정일" in admin_issue.columns:
+        for _, a in admin_issue.iterrows():
+            nm = str(a["종목명"]).strip()
+            kd = str(a["지정일"]).replace("/", "").replace("-", "").strip()[:8]
+            if nm and len(kd) == 8:
+                kind_map[nm] = kd
+    designated_states = {S_DESIGNATED, S_RELEASE_PENDING, S_DELISTING_RISK, S_DELISTING_CONFIRMED}
+    for r in rows:
+        r["kind_design_date"] = (
+            kind_map.get(str(r["name"]).strip()) if r["state"] in designated_states else None
+        )
 
     def _recon(mine, off):
         return {
