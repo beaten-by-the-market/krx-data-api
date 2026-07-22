@@ -399,6 +399,20 @@ def test_mktcap_early_delist_impossible():
     assert res.status == DELIST_EARLY
 
 
+def test_mktcap_kospi_needs_45_consecutive_no_cumulative():
+    # 유가: 회복 = 45연속만(누적조건 없음). 누적 40일이어도 연속 45 안 되면 미회복.
+    dates = _dates(90)
+    block = [THR2] * 20 + [1] * 5  # 20연속 이상 + 5미달 반복 → 연속 최대 20, 누적 다수
+    caps = (block * 4)[:90]
+    res = evaluate_mktcap_recovery_failure(dates, caps, 1, THR2, consec_days=45, cumul_days=None)
+    assert res.status == DELIST_CONFIRMED   # 45연속 못 채움 → 상폐(누적조건 없음)
+    assert res.max_consec == 20
+    # 45연속이면 회복
+    caps2 = [THR2] * 45 + [1] * 45
+    res2 = evaluate_mktcap_recovery_failure(dates, caps2, 1, THR2, consec_days=45, cumul_days=None)
+    assert res2.status == RECOVERED and res2.recovered_by == "가"
+
+
 def test_mktcap_recovery_period_threshold_callable():
     # 날짜별 기준(callable) 지원: 후반 기준이 높아 이상 판정 달라짐
     dates = list(range(1, 41))

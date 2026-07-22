@@ -44,6 +44,14 @@ PRICE_MARKETS = {"KOSPI", "KOSDAQ"}
 # 주가 미달 일수는 **시행일(2026.7.1) 이후 최초로 1,000원 미만인 날부터** 산정(부칙 제3조①).
 PRICE_COUNT_START = "20260701"
 
+# 시가총액 미달 상장폐지 회복조건(시장별로 다름). 지정 후 90거래일 내 회복 실패 시 상폐.
+#   유가(제48조①9호): 기준 이상 45일 연속.
+#   코스닥(제54조①12호): 기준 이상 10일 연속(가) 또는 누적 30일(나) 중 하나.
+MKTCAP_DELIST_RECOVERY = {
+    "KOSPI": {"consec_days": 45, "cumul_days": None},
+    "KOSDAQ": {"consec_days": 10, "cumul_days": 30},
+}
+
 
 def mktcap_threshold_won(market: str, date: str) -> Optional[float]:
     """해당 시장·날짜(YYYYMMDD)의 시가총액 미달 기준액(원). 시장 미포함이면 None."""

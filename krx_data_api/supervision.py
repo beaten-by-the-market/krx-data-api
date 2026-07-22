@@ -338,15 +338,15 @@ def evaluate_mktcap_recovery_failure(
     *,
     window_days: int = MKTCAP_DELIST_WINDOW_DAYS,
     consec_days: int = MKTCAP_RECOVERY_CONSEC_DAYS,
-    cumul_days: int = MKTCAP_RECOVERY_CUMUL_DAYS,
+    cumul_days: Optional[int] = MKTCAP_RECOVERY_CUMUL_DAYS,
 ) -> MktcapRecoveryResult:
-    """규정 제54조①13호... 아니라 제54조①12호: 시가총액 미달로 관리종목 지정된 후
-    window_days(90) 매매거래일 동안 시가총액이 다음 두 회복조건 중 **하나도** 충족
-    못하면 상장폐지. (하나라도 충족하면 상폐 아님)
+    """시가총액 미달로 관리종목 지정된 후 window_days(90) 매매거래일 동안 시가총액
+    회복조건을 충족 못하면 상장폐지. 시장별로 회복조건이 다르다:
 
-    가. 기준액 이상인 상태가 consec_days(10) 이상 **연속**
-    나. 기준액 이상인 일수가 cumul_days(30) 이상 **누적**
+    - 유가(제48조①9호): 기준 이상이 **45일 연속**(consec_days=45, cumul_days=None).
+    - 코스닥(제54조①12호): 기준 이상 **10일 연속(가) 또는 누적 30일(나)** 중 하나.
 
+    consec_days : '연속' 회복 일수. cumul_days : '누적' 회복 일수(None이면 누적조건 없음).
     threshold : 기준액(scalar) 또는 날짜별 함수 f(date)->기준액(부칙 시기별 기준용).
     caps : 시가총액 시계열(None=매매거래일 아님/스킵).
     designation_date : 시총미달 지정일(dates와 같은 형식).
@@ -376,7 +376,7 @@ def evaluate_mktcap_recovery_failure(
             if recovered_by is None:
                 if consec >= consec_days:
                     recovered_by = "가"
-                elif cumulative >= cumul_days:
+                elif cumul_days is not None and cumulative >= cumul_days:
                     recovered_by = "나"
         else:
             consec = 0
@@ -390,7 +390,7 @@ def evaluate_mktcap_recovery_failure(
         remaining = window_days - observed_days
         # 남은 기간으로 '가'(연속 consec) 또는 '나'(누적 cumul) 달성 가능한가?
         can_consec = (trailing_consec + remaining) >= consec_days or remaining >= consec_days
-        can_cumul = (cumulative + remaining) >= cumul_days
+        can_cumul = cumul_days is not None and (cumulative + remaining) >= cumul_days
         status = WATCHING if (can_consec or can_cumul) else DELIST_EARLY
 
     return MktcapRecoveryResult(

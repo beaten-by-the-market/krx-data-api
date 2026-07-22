@@ -145,8 +145,11 @@ def stock_status_rows(
                     window = sv.PRICE_DELIST_WINDOW_DAYS
                     delisting = {"recovery_status": rr.status, "observed": rr.observed_days,
                                  "reason": "주가"}
-                else:  # mktcap: 제54조12호(회복=기준이상 10연속 또는 누적30)
-                    rr = sv.evaluate_mktcap_recovery_failure(dates, caps, eff, thr_fn)
+                else:  # mktcap: 유가=제48조9호(45연속) / 코스닥=제54조12호(10연속 or 누적30)
+                    rec = scr.MKTCAP_DELIST_RECOVERY.get(market, {"consec_days": 10, "cumul_days": 30})
+                    rr = sv.evaluate_mktcap_recovery_failure(
+                        dates, caps, eff, thr_fn,
+                        consec_days=rec["consec_days"], cumul_days=rec["cumul_days"])
                     window = sv.MKTCAP_DELIST_WINDOW_DAYS
                     delisting = {"recovery_status": rr.status, "observed": rr.observed_days,
                                  "recovered_by": rr.recovered_by, "reason": "시총"}
