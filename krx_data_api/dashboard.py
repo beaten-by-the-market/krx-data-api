@@ -265,11 +265,9 @@ def build_dashboard_artifacts(
     srt_to_std = {str(meta_idx.loc[c]["단축코드"]): c for c in close_w.columns if c in meta_idx.index}
 
     if series_codes is None:
-        appr = sorted([r for r in rows if r["state"] == S_APPROACHING],
-                      key=lambda r: r["countdown"]["to_designation"] or 99)
-        series_codes = [r["code"] for r in
-                        appr[:series_top] + [r for r in rows if r["state"] in
-                        (S_DESIGNATED, S_DELISTING_RISK)][:series_top]]
+        # 기본: 비정상(rows에 포함된) 전 종목의 시계열을 넣는다. rows가 비정상만이라
+        # 개수가 제한적이므로 용량 부담이 작고, 드릴다운에서 '샘플 미포함' 안내가 안 뜬다.
+        series_codes = [r["code"] for r in rows]
     series = {}
     for srt in series_codes:
         std = srt_to_std.get(srt)
