@@ -27,7 +27,7 @@ def test_screen_market_price_designation():
     closes = [900] * 30                # 주가 미달 30일
     caps = [500_000_000_000] * 30      # 시총 넉넉
     cache = _long_cache("KR7000001000", dates, closes, caps)
-    events = scr.screen_market(cache, count_start=None)
+    events = scr.screen_market(cache, price_count_start=None)
     price = events[events["사유"] == "주가"]
     assert len(price) == 1
     assert price.iloc[0]["종류"] == "designate"
@@ -41,7 +41,7 @@ def test_screen_market_mktcap_designation():
     closes = [5000] * 30
     caps = [10_000_000_000] * 30       # 100억 < 300억
     cache = _long_cache("KR7000001000", dates, closes, caps)
-    events = scr.screen_market(cache, count_start=None)
+    events = scr.screen_market(cache, price_count_start=None)
     cap = events[events["사유"] == "시가총액"]
     assert len(cap) == 1
     assert cap.iloc[0]["종류"] == "designate"
@@ -53,7 +53,7 @@ def test_current_status_designation_with_effective_date():
     closes = [900] * 30 + [900] * 5
     caps = [500_000_000_000] * 35
     cache = _long_cache("KR7000001000", dates, closes, caps)
-    events = scr.screen_market(cache, count_start=None)
+    events = scr.screen_market(cache, price_count_start=None)
     status = scr.current_status(events)
     price = status[status["사유"] == "주가"].iloc[0]
     assert price["상태"] == "관리"
@@ -65,7 +65,7 @@ def test_current_status_as_of_excludes_future_effective():
     closes = [900] * 30 + [900]
     caps = [500_000_000_000] * 31
     cache = _long_cache("KR7000001000", dates, closes, caps)
-    events = scr.screen_market(cache, count_start=None)
+    events = scr.screen_market(cache, price_count_start=None)
     # 발효일 = dates[30]. as_of를 그 전날로 주면 아직 지정 전 → 빈 상태.
     status = scr.current_status(events, as_of=dates[29])
     assert status.empty or (status["상태"] == "관리").sum() == 0
@@ -76,34 +76,57 @@ def test_screen_market_empty_cache():
     assert events.empty
 
 
-def test_count_start_excludes_pre_revision_days():
-    # 개정일(20260513) 전 20일 미달 + 개정일부터 20일 미달 = 실질 창 20일뿐 → 미지정
-    pre = [f"202604{d:02d}" for d in range(1, 21)]      # 04/01~04/20 (개정 전)
-    post = [f"202605{d:02d}" for d in range(13, 33)]    # 05/13~ (개정 후, 20일)
-    dates = pre + [d for d in post if d <= "20260531"]  # 안전하게 05월 범위
-    closes = [900] * len(dates)
-    caps = [500_000_000_000] * len(dates)
+def test_price_count_start_excludes_pre_launch():
+    # 부칙 제3조①: 시행일(20260701) 전 주가미달은 카운트 안 함.
+    pre = [f"202606{d:02d}" for d in range(1, 31)]   # 6월(시행 전) 30일
+    post = [f"202607{d:02d}" for d in range(1, 29)]  # 7월(시행 후) 28일
+    dates = pre + post
+    closes = [900] * len(dates)               # 계속 1,000원 미만
+    caps = [500_000_000_000] * len(dates)     # 시총 넉넉
     cache = _long_cache("KR7000001000", dates, closes, caps)
-    # count_start 기본(20260513) → 개정 후 날짜만 카운트 → 20일 미만이면 미지정
-    ev_default = scr.screen_market(cache)
-    assert ev_default[ev_default["종류"] == "designate"].empty
-    # count_start=None → 전체 40일 미달 → 지정 발생
-    ev_all = scr.screen_market(cache, count_start=None)
-    assert not ev_all[ev_all["종류"] == "designate"].empty
+    # 기본 price_count_start=20260701 → 시행 후 28일만 카운트(<30) → 미지정
+    ev = scr.screen_market(cache)
+    assert ev[ev["사유"] == "주가"].empty
+    # 제한 해제 → 58일 미달 → 지정
+    ev_all = scr.screen_market(cache, price_count_start=None)
+    assert not ev_all[ev_all["사유"] == "주가"].empty
 
 
-def test_kospi_threshold_500_vs_kosdaq_300():
-    # 시총 400억: KOSPI(500억 기준)에선 미달, KOSDAQ(300억)에선 미달 아님
-    dates = [f"2026{d:04d}" for d in range(101, 131)]
+def test_mktcap_threshold_won_schedule():
+    # 시기별 임계값(부칙 경과규정)
+    assert scr.mktcap_threshold_won("KOSDAQ", "20260630") == 15_000_000_000
+    assert scr.mktcap_threshold_won("KOSDAQ", "20260701") == 20_000_000_000
+    assert scr.mktcap_threshold_won("KOSDAQ", "20270101") == 30_000_000_000
+    assert scr.mktcap_threshold_won("KOSPI", "20260630") == 20_000_000_000
+    assert scr.mktcap_threshold_won("KOSPI", "20260701") == 30_000_000_000
+    assert scr.mktcap_threshold_won("KONEX", "20260701") is None
+
+
+def test_market_period_thresholds():
+    # 시총 180억(시행 전): KOSPI(200억 기준)만 미달, KOSDAQ(150억)은 미달 아님
+    dates = [f"202606{d:02d}" for d in range(1, 31)]  # 6월(시행 전) 30일
     closes = [5000] * 30
-    caps = [40_000_000_000] * 30  # 400억
+    caps = [18_000_000_000] * 30  # 180억
     kospi = _long_cache("KR7000002000", dates, closes, caps, mkt="KOSPI")
     kosdaq = _long_cache("KR7000003000", dates, closes, caps, mkt="KOSDAQ")
+    evk = scr.screen_market(kospi, price_count_start=None)
+    assert not evk[evk["사유"] == "시가총액"].empty          # KOSPI 미달
+    assert scr.screen_market(kosdaq, price_count_start=None).empty  # KOSDAQ 미달 아님
 
-    ev_kospi = scr.screen_market(kospi, count_start=None)
-    ev_kosdaq = scr.screen_market(kosdaq, count_start=None)
-    assert not ev_kospi[ev_kospi["사유"] == "시가총액"].empty   # KOSPI 미달
-    assert ev_kosdaq[ev_kosdaq["사유"] == "시가총액"].empty      # KOSDAQ 미달 아님
+
+def test_mktcap_period_transition_across_launch():
+    # 6월 150억↑·7월 200억↓ 종목(코스닥): 6월엔 미달 아님(>150), 7월부터 미달(<200)
+    pre = [f"202606{d:02d}" for d in range(1, 31)]   # 6월 30일, 시총 180억(>150 → 정상)
+    post = [f"202607{d:02d}" for d in range(1, 31)]  # 7월 30일, 시총 180억(<200 → 미달)
+    dates = pre + post
+    caps = [18_000_000_000] * len(dates)  # 180억 내내 동일
+    closes = [5000] * len(dates)
+    cache = _long_cache("KR7000009000", dates, closes, caps, srt="000090", mkt="KOSDAQ")
+    ev = scr.screen_market(cache, price_count_start=None)
+    cap = ev[(ev["사유"] == "시가총액") & (ev["종류"] == "designate")]
+    assert len(cap) == 1
+    # 7월 1일부터 30거래일째에 지정 → 판정일은 post의 30번째
+    assert cap.iloc[0]["판정일"] == post[29]
 
 
 def test_konex_excluded_entirely():
@@ -112,7 +135,7 @@ def test_konex_excluded_entirely():
     closes = [500] * 30            # 주가 미달 수준
     caps = [1_000_000_000] * 30    # 10억, 시총 미달 수준
     konex = _long_cache("KR7000004000", dates, closes, caps, mkt="KONEX")
-    ev = scr.screen_market(konex, count_start=None)
+    ev = scr.screen_market(konex, price_count_start=None)
     assert ev.empty
 
 
@@ -122,9 +145,9 @@ def test_spac_excluded():
     closes = [2000] * 30
     caps = [10_000_000_000] * 30  # 100억 < 300억
     spac = _long_cache("KR70044K0008", dates, closes, caps, mkt="KOSDAQ", name="삼성스팩10호")
-    assert scr.screen_market(spac, count_start=None).empty
+    assert scr.screen_market(spac, price_count_start=None).empty
     # exclude_spac=False로 끄면 잡힘
-    ev = scr.screen_market(spac, count_start=None, exclude_spac=False)
+    ev = scr.screen_market(spac, price_count_start=None, exclude_spac=False)
     assert not ev[ev["사유"] == "시가총액"].empty
 
 
@@ -135,11 +158,11 @@ def test_preferred_excluded_by_short_code_suffix():
     caps = [10_000_000_000] * 30  # 100억 < 300억
     pref = _long_cache("KR7000005005", dates, closes, caps, srt="000005",
                        mkt="KOSDAQ", name="테스트우")
-    assert scr.screen_market(pref, count_start=None).empty
+    assert scr.screen_market(pref, price_count_start=None).empty
     # 보통주(끝자리 0)는 잡힘
     common = _long_cache("KR7000006000", dates, closes, caps, srt="000060",
                          mkt="KOSDAQ", name="테스트")
-    assert not scr.screen_market(common, count_start=None).empty
+    assert not scr.screen_market(common, price_count_start=None).empty
 
 
 def test_reit_excluded_by_suffix_not_substring():
@@ -149,11 +172,11 @@ def test_reit_excluded_by_suffix_not_substring():
     # '리츠'로 끝나는 리츠 → 제외
     reit = _long_cache("KR7000007000", dates, closes, caps, srt="000070",
                        mkt="KOSPI", name="케이탑리츠")
-    assert scr.screen_market(reit, count_start=None).empty
+    assert scr.screen_market(reit, price_count_start=None).empty
     # '리츠'가 중간에 든 일반주(블리츠웨이) → 제외 안 됨
     blitz = _long_cache("KR7000008000", dates, closes, caps, srt="000080",
                         mkt="KOSDAQ", name="블리츠웨이엔터테인먼트")
-    assert not scr.screen_market(blitz, count_start=None).empty
+    assert not scr.screen_market(blitz, price_count_start=None).empty
 
 
 def test_foreign_stock_included():
@@ -163,7 +186,7 @@ def test_foreign_stock_included():
     caps = [10_000_000_000] * 30  # 100억 < 300억(KOSDAQ)
     foreign = _long_cache("HK0000214814", dates, closes, caps, srt="900270",
                           mkt="KOSDAQ", name="헝셩그룹")
-    ev = scr.screen_market(foreign, count_start=None)
+    ev = scr.screen_market(foreign, price_count_start=None)
     assert not ev[ev["사유"] == "시가총액"].empty
     assert scr.excluded_reason("900270", "헝셩그룹", "HK0000214814") is None
 
@@ -175,7 +198,7 @@ def test_foreign_dr_included():
     caps = [10_000_000_000] * 30
     dr = _long_cache("KR8840150005", dates, closes, caps, srt="950200",
                      mkt="KOSDAQ", name="소마젠")
-    assert not scr.screen_market(dr, count_start=None).empty
+    assert not scr.screen_market(dr, price_count_start=None).empty
     assert scr.excluded_reason("950200", "소마젠", "KR8840150005") is None
 
 
@@ -186,11 +209,11 @@ def test_infra_fund_excluded_by_code_biotech_kept():
     # 인프라펀드(큐레이트 코드) → 제외
     infra = _long_cache("KR7088980008", dates, closes, caps, srt="088980",
                         mkt="KOSPI", name="맥쿼리인프라")
-    assert scr.screen_market(infra, count_start=None).empty
+    assert scr.screen_market(infra, price_count_start=None).empty
     # 바이오인프라(일반 회사, 코드 다름) → 유지
     bio = _long_cache("KR7199730003", dates, closes, caps, srt="199730",
                       mkt="KOSDAQ", name="바이오인프라")
-    assert not scr.screen_market(bio, count_start=None).empty
+    assert not scr.screen_market(bio, price_count_start=None).empty
 
 
 def test_universe_whitelist_filters():
@@ -201,7 +224,7 @@ def test_universe_whitelist_filters():
     a = _long_cache("KR7000010000", dates, closes, caps, srt="000100", name="포함")
     b = _long_cache("KR7000020000", dates, closes, caps, srt="000200", name="제외")
     cache = pd.concat([a, b], ignore_index=True)
-    ev = scr.screen_market(cache, count_start=None, universe={"000100"})
+    ev = scr.screen_market(cache, price_count_start=None, universe={"000100"})
     codes = set(ev["단축코드"])
     assert codes == {"000100"}  # 유니버스 밖 종목은 판정 안 함
 
@@ -214,8 +237,8 @@ def test_universe_overrides_heuristics():
     spac = _long_cache("KR70044K0008", dates, closes, caps, srt="0044K0",
                        name="삼성스팩10호")
     # 휴리스틱 경로면 제외, 유니버스 경로면 포함
-    assert scr.screen_market(spac, count_start=None).empty
-    ev = scr.screen_market(spac, count_start=None, universe={"0044K0"})
+    assert scr.screen_market(spac, price_count_start=None).empty
+    ev = scr.screen_market(spac, price_count_start=None, universe={"0044K0"})
     assert not ev.empty
 
 
@@ -249,12 +272,12 @@ def test_screen_price_recovery_failure_recovered():
 
 
 def test_current_designations_writes_csv(tmp_path):
-    dates = [f"2026{d:04d}" for d in range(101, 136)]  # 35 dates (개정 전이지만 count_start=None 사용 위해)
+    dates = [f"2026{d:04d}" for d in range(101, 136)]  # 35 dates (개정 전이지만 price_count_start=None 사용 위해)
     closes = [900] * 35
     caps = [500_000_000_000] * 35
     cache = _long_cache("KR7000001000", dates, closes, caps, name="가가종목")
     out = str(tmp_path / "designated.csv")
-    res = scr.current_designations(cache, count_start=None, out_csv=out)
+    res = scr.current_designations(cache, price_count_start=None, out_csv=out)
     assert (res["상태"] == "관리").all()
     assert (res["사유"] == "주가").any()
     # CSV 왕복

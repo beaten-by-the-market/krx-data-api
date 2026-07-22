@@ -28,17 +28,33 @@ UNIVERSE_SECUGRPS = ("ST", "FS", "DR")     # 주권 / 외국주권 / 주식예�
 REASON_MKTCAP = "시가총액"
 REASON_PRICE = "주가"
 
-# 시장별 시가총액 미달 기준 (사용자 확인 2026-07-22):
-#   - KOSPI(유가, 규정 제47조9호): 상장시가총액 500억원 미달
-#   - KOSDAQ(코스닥, 규정 제53조5호): 시가총액 300억원 미만
-#   - KONEX(코넥스): 이 기준 없음 → 시총·주가 판정에서 제외
-# 우선주·외국주 등 주식 종류와 무관하게 각 시장 기준을 동일하게 적용한다.
-MKTCAP_THRESHOLD_BY_MARKET = {
-    "KOSPI": 50_000_000_000,   # 500억
-    "KOSDAQ": 30_000_000_000,  # 300억
+# 시가총액 미달 기준은 시장별 + **부칙 경과규정에 따라 시기별로 단계 적용**된다
+# (부칙 2026.5.13 신설, 시행 2026.7.1). 각 날짜가 속한 구간의 기준으로 미달을 판단한다.
+#   KOSDAQ(제53조5호):  ~2026.6.30 150억 / 2026.7.1~12.31 200억 / 2027.1.1~ 300억(본칙)
+#   KOSPI (제47조9호):   ~2026.6.30 200억 / 2026.7.1~12.31 300억 / 2027.1.1~ 500억(본칙)
+#   KONEX: 규칙 없음 → 제외.
+# 우선주·외국주 무관하게 각 시장 기준을 동일 적용. 시총 일수는 연속(카운트 시작 제한 없음).
+# 구간: (구간시작일 포함, 기준액). 정렬된 상태로 두고 날짜 이상인 마지막 구간을 취한다.
+MKTCAP_SCHEDULE = {
+    "KOSPI": [("00000000", 20_000_000_000), ("20260701", 30_000_000_000), ("20270101", 50_000_000_000)],
+    "KOSDAQ": [("00000000", 15_000_000_000), ("20260701", 20_000_000_000), ("20270101", 30_000_000_000)],
 }
 # 주가 미달 기준(1,000원)은 KOSPI/KOSDAQ 공통. KONEX는 제외.
 PRICE_MARKETS = {"KOSPI", "KOSDAQ"}
+# 주가 미달 일수는 **시행일(2026.7.1) 이후 최초로 1,000원 미만인 날부터** 산정(부칙 제3조①).
+PRICE_COUNT_START = "20260701"
+
+
+def mktcap_threshold_won(market: str, date: str) -> Optional[float]:
+    """해당 시장·날짜(YYYYMMDD)의 시가총액 미달 기준액(원). 시장 미포함이면 None."""
+    sched = MKTCAP_SCHEDULE.get(market)
+    if not sched:
+        return None
+    thr = None
+    for start, amt in sched:
+        if str(date) >= start:
+            thr = amt
+    return thr
 
 # 규칙 대상 = 보통주권 + 외국주권 + 외국주식예탁증권(DR) (사용자 확인 2026-07-22).
 # 외국주권·DR은 단축코드 900xxx/950xxx로 끝자리가 0이라 아래 우선주 필터에 걸리지 않아
@@ -184,15 +200,24 @@ def _meta_by_code(cache_df: pd.DataFrame) -> pd.DataFrame:
     return latest
 
 
+def _schedule_lookup(sched, date) -> Optional[float]:
+    thr = None
+    for start, amt in sched:
+        if str(date) >= start:
+            thr = amt
+    return thr
+
+
 def screen_market(
     cache_df: pd.DataFrame,
     *,
-    mktcap_threshold_by_market: Optional[dict] = None,
+    mktcap_schedule: Optional[dict] = None,
     price_threshold: float = sv.PRICE_THRESHOLD,
     price_markets: Optional[set] = None,
+    price_count_start: Optional[str] = PRICE_COUNT_START,
+    mktcap_count_start: Optional[str] = None,
     designate_days: int = sv.DESIGNATE_DAYS,
     release_days: int = sv.RELEASE_DAYS,
-    count_start: Optional[str] = RULE_REVISION_DATE,
     universe: Optional[set] = None,
     exclude_spac: bool = True,
     exclude_preferred: bool = True,
@@ -201,27 +226,25 @@ def screen_market(
 ) -> pd.DataFrame:
     """캐시 전체에 대해 종목×사유별 지정/해제 이벤트를 산출한다.
 
-    시가총액 기준은 **시장별로 다르다**(KOSPI 500억 / KOSDAQ 300억). KONEX는
-    시총·주가 규칙이 없어 제외한다.
+    시가총액 기준은 **시장별 + 시기별(부칙 경과규정)** 로 다르다(MKTCAP_SCHEDULE).
+    각 날짜가 속한 구간의 기준으로 미달을 판단한다. KONEX는 규칙이 없어 제외.
 
     universe : 판정 대상 단축코드 집합(권장). 주면 이 집합에 든 종목만 판정하고
-        이름/코드 휴리스틱(exclude_*)은 건너뛴다. `build_target_universe`가 준 목록
-        (보통주권+외국주권+DR)을 쓰면 스팩·우선주·리츠·인프라펀드가 이미 빠져 있다.
-        None이면 종전 휴리스틱(exclude_*)으로 대상을 거른다.
-    mktcap_threshold_by_market : {시장명: 기준액}. 없으면 MKTCAP_THRESHOLD_BY_MARKET.
-        이 맵에 없는 시장(KONEX 등)은 시가총액 판정에서 제외.
-    price_markets : 주가 미달 규칙을 적용할 시장 집합. 없으면 PRICE_MARKETS.
-    count_start : 이 일자(YYYYMMDD) 이전 날짜는 카운트에서 제외. 기본 규정 개정일(2026.5.13).
+        이름/코드 휴리스틱(exclude_*)은 건너뛴다.
+    mktcap_schedule : {시장: [(구간시작YYYYMMDD, 기준액), ...]}. 없으면 MKTCAP_SCHEDULE.
+        여기 없는 시장(KONEX 등)은 시가총액 판정에서 제외.
+    price_count_start : 주가 미달 카운트 시작일(부칙 제3조① 시행일 2026.7.1). 이 날 이전
+        종가는 주가 카운트에서 제외. None이면 제한 없음.
+    mktcap_count_start : 시총 미달 카운트 시작 제한(기본 None=연속). 시총은 부칙상
+        종전부터 연속 산정하되 기준만 시기별이라 보통 None.
 
     Returns
     -------
-    이벤트 롱 DataFrame. 컬럼:
-        표준코드, 단축코드, 종목명, 시장, 사유(시가총액|주가),
-        종류(designate|release), 판정일, 발효일, 연속일수, 값
-    발효일(익일)이 캐시 마지막 거래일 다음이라 아직 없으면 NaN → "당일예측" 후보.
+    이벤트 롱 DataFrame: 표준코드·단축코드·종목명·시장·사유(시가총액|주가)·
+        종류(designate|release)·판정일·발효일·연속일수·값
     """
-    if mktcap_threshold_by_market is None:
-        mktcap_threshold_by_market = MKTCAP_THRESHOLD_BY_MARKET
+    if mktcap_schedule is None:
+        mktcap_schedule = MKTCAP_SCHEDULE
     if price_markets is None:
         price_markets = PRICE_MARKETS
     event_columns = [
@@ -232,13 +255,8 @@ def screen_market(
         return pd.DataFrame(columns=event_columns)
 
     close_wide = ds.to_wide(cache_df, "종가")
-    cap_wide = ds.to_wide(cache_df, "시가총액")
-    if count_start is not None:
-        close_wide = close_wide[close_wide.index >= str(count_start)]
-        cap_wide = cap_wide[cap_wide.index >= str(count_start)]
-    # 두 매트릭스의 일자 인덱스·종목 컬럼을 정렬해 맞춘다.
+    cap_wide = ds.to_wide(cache_df, "시가총액").reindex(index=close_wide.index)
     dates = close_wide.index.tolist()
-    cap_wide = cap_wide.reindex(index=close_wide.index)
     meta = _meta_by_code(cache_df)
 
     rows = []
@@ -247,62 +265,49 @@ def screen_market(
         market = m["시장"] if m is not None else None
 
         if universe is not None:
-            # 권위있는 화이트리스트 방식: 목록에 없으면 대상 아님.
             if m is None or str(m["단축코드"]) not in universe:
                 continue
         else:
-            # 폴백: 이름/코드 휴리스틱으로 규칙 비적용 종목 제외.
             if m is not None and excluded_reason(
                 m["단축코드"], m["종목명"], code,
-                exclude_spac=exclude_spac,
-                exclude_preferred=exclude_preferred,
-                exclude_reit=exclude_reit,
-                exclude_infra_funds=exclude_infra_funds,
+                exclude_spac=exclude_spac, exclude_preferred=exclude_preferred,
+                exclude_reit=exclude_reit, exclude_infra_funds=exclude_infra_funds,
             ):
                 continue
 
-        # 시장별 시총 기준. 맵에 없으면(KONEX 등) 시총 판정 제외.
-        cap_thr = mktcap_threshold_by_market.get(market)
-        do_mktcap = cap_thr is not None
+        sched = mktcap_schedule.get(market)
+        do_mktcap = sched is not None
         do_price = market in price_markets
         if not (do_mktcap or do_price):
-            continue  # KONEX 등 규칙 미적용 시장은 통째로 건너뜀
+            continue  # KONEX 등
 
         closes = _series_none(close_wide[code].values)
-        caps = (
-            _series_none(cap_wide[code].values)
-            if code in cap_wide.columns
-            else [None] * len(dates)
-        )
-        # 규칙 미적용 사유는 전부 None(=스킵)으로 넣어 이벤트가 안 나오게 한다.
-        res = sv.evaluate_stock(
-            dates,
-            closes if do_price else [None] * len(dates),
-            caps if do_mktcap else [None] * len(dates),
-            mktcap_threshold=cap_thr if do_mktcap else sv.MKTCAP_THRESHOLD,
-            price_threshold=price_threshold,
-            designate_days=designate_days,
-            release_days=release_days,
-        )
-        for reason, events in (
-            (REASON_MKTCAP, res.mktcap_events),
-            (REASON_PRICE, res.price_events),
-        ):
+        caps = (_series_none(cap_wide[code].values)
+                if code in cap_wide.columns else [None] * len(dates))
+
+        events_by_reason = []
+        if do_mktcap:
+            thr_fn = (lambda s: (lambda d: _schedule_lookup(s, d)))(sched)
+            cser = [(d, v) for d, v in zip(dates, caps)
+                    if mktcap_count_start is None or d >= mktcap_count_start]
+            events_by_reason.append((REASON_MKTCAP, sv.run_state_machine(
+                cser, thr_fn, designate_days=designate_days, release_days=release_days)))
+        if do_price:
+            pser = [(d, v) for d, v in zip(dates, closes)
+                    if price_count_start is None or d >= price_count_start]
+            events_by_reason.append((REASON_PRICE, sv.run_state_machine(
+                pser, price_threshold, designate_days=designate_days, release_days=release_days)))
+
+        for reason, events in events_by_reason:
             for e in events:
-                rows.append(
-                    {
-                        "표준코드": code,
-                        "단축코드": m["단축코드"] if m is not None else None,
-                        "종목명": m["종목명"] if m is not None else None,
-                        "시장": m["시장"] if m is not None else None,
-                        "사유": reason,
-                        "종류": e.kind,
-                        "판정일": e.trigger_date,
-                        "발효일": e.effective_date,
-                        "연속일수": e.streak,
-                        "값": e.value,
-                    }
-                )
+                rows.append({
+                    "표준코드": code,
+                    "단축코드": m["단축코드"] if m is not None else None,
+                    "종목명": m["종목명"] if m is not None else None,
+                    "시장": market, "사유": reason, "종류": e.kind,
+                    "판정일": e.trigger_date, "발효일": e.effective_date,
+                    "연속일수": e.streak, "값": e.value,
+                })
     return pd.DataFrame(rows, columns=event_columns)
 
 
@@ -507,23 +512,22 @@ def current_designations(
     cache_df: pd.DataFrame,
     *,
     as_of: Optional[str] = None,
-    count_start: Optional[str] = RULE_REVISION_DATE,
     universe: Optional[set] = None,
     out_csv: Optional[str] = None,
+    **screen_kwargs,
 ) -> pd.DataFrame:
     """현재 관리종목 지정 후보(집합·현재상태)를 산출한다 — 확정 산출물.
 
-    지정일 정확성은 보류 상태라 '판정일/발효일'은 참고값이고, 이 함수의 핵심은
-    "as_of 시점에 어떤 종목이 어떤 사유로 관리 상태인가"이다.
+    시총은 부칙 시기별 임계값으로 연속 산정, 주가는 시행일(2026.7.1) 이후부터 산정
+    하여 지정일까지 정확히 재현된다. '지정발효일'은 KRX 최초지정일과 일치한다.
 
-    as_of      : 이 일자까지 발효된 이벤트만 반영. None이면 캐시 마지막까지.
-    count_start: 카운팅 시작일(기본 2026.5.13 개정일).
-    out_csv    : 주면 결과를 utf-8-sig CSV로 저장(다음 수집 때 재생성).
+    as_of   : 이 일자까지 발효된 이벤트만 반영. None이면 캐시 마지막까지.
+    out_csv : 주면 결과를 utf-8-sig CSV로 저장.
 
     Returns: 표준코드·단축코드·종목명·시장·사유·상태·지정발효일·해제발효일
              (상태=='관리'인 행만).
     """
-    events = screen_market(cache_df, count_start=count_start, universe=universe)
+    events = screen_market(cache_df, universe=universe, **screen_kwargs)
     status = current_status(events, as_of=as_of)
     designated = status[status["상태"] == "관리"].reset_index(drop=True)
     if out_csv is not None:
@@ -538,9 +542,9 @@ def reconcile_with_supervised(
     cache_df: pd.DataFrame,
     *,
     reason: str = REASON_MKTCAP,
-    count_start: Optional[str] = RULE_REVISION_DATE,
     universe: Optional[set] = None,
     session=None,
+    **screen_kwargs,
 ) -> dict:
     """스크리너가 뽑은 '현재 지정' 집합을 KRX supervised와 대조한다.
 
@@ -554,7 +558,7 @@ def reconcile_with_supervised(
         krx       : supervised 원본(해당 사유 필터) DataFrame
         mine      : 내 현재 지정 상태 DataFrame
     """
-    events = screen_market(cache_df, count_start=count_start, universe=universe)
+    events = screen_market(cache_df, universe=universe, **screen_kwargs)
     status = current_status(events)
     mine = status[(status["사유"] == reason) & (status["상태"] == "관리")]
     my_set = set(mine["표준코드"])

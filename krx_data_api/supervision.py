@@ -68,7 +68,7 @@ class SupervisionEvent:
 
 def run_state_machine(
     series: Sequence[tuple[Any, Any]],
-    threshold: float,
+    threshold,
     *,
     designate_days: int = DESIGNATE_DAYS,
     release_days: int = RELEASE_DAYS,
@@ -82,7 +82,9 @@ def run_state_machine(
         value 가 None 이면 그 날은 판정에서 제외한다(카운트 증가도 리셋도 하지 않음).
         상장 전/상장폐지 후의 결측(피벗 NaN)을 자연스럽게 건너뛰기 위한 처리로,
         결과적으로 카운트는 값이 처음 존재하는 날(=상장 첫날)부터 시작된다.
-    threshold : 기준값. 미달 = value < threshold, 이상 = value >= threshold.
+    threshold : 기준값(scalar) 또는 **날짜별 함수** `f(date)->기준값`. 후자는 부칙의
+        시기별 시총 임계값처럼 날짜마다 기준이 다를 때 쓴다.
+        미달 = value < 기준, 이상 = value >= 기준.
     initial_state : 창 시작 시점의 상태. 이미 관리종목으로 알려진 종목은
         SUPERVISED 로 시작해 해제(45일) 카운트부터 돌린다.
 
@@ -98,6 +100,7 @@ def run_state_machine(
     sufficient_streak = 0  # SUPERVISED에서 연속 이상 일수
     events: list[SupervisionEvent] = []
 
+    thr_fn = threshold if callable(threshold) else (lambda _d: threshold)
     n = len(series)
     for i in range(n):
         date, value = series[i]
@@ -105,7 +108,7 @@ def run_state_machine(
             # 데이터 없는 날: 판정 제외(연속성 유지, 리셋도 증가도 안 함).
             continue
 
-        below = value < threshold  # 미달 여부
+        below = value < thr_fn(date)  # 미달 여부(날짜별 기준 가능)
 
         if state == NORMAL:
             if below:
