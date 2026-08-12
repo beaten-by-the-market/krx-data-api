@@ -71,6 +71,24 @@ def test_official_reconcile_and_badge():
     assert r["official_design_date"] == "20260711"
 
 
+def test_official_from_supervised_combined_and_scoped():
+    # KRX supervised는 다중사유를 콤마로 결합한다. 부분매칭으로 콤바인 라벨을 잡되,
+    # 우선주("종류주식 시가총액 미달")는 유니버스 밖이라 공식집합에서 제외돼야 한다.
+    sup = pd.DataFrame({
+        "ISU_CD": ["000100", "000200", "000105"],
+        "LIST_BZ_RSN_NM": [
+            "시가총액 미달,주가 미달(동전주)",   # 보통주 콤바인(시총+동전주)
+            "주가 미달(동전주)",                  # 보통주 동전주 단독
+            "종류주식 시가총액 미달",             # 우선주(유니버스 밖)
+        ],
+        "FST_DESIGN_DD": ["2026/07/11", "2026/07/12", "2026/07/13"],
+    })
+    off_cap, off_price, dates = dash._official_from_supervised(sup, universe={"000100", "000200"})
+    assert off_cap == {"000100"}                    # 콤바인 인식 + 우선주(000105) 스코핑 제외
+    assert off_price == {"000100", "000200"}        # "주가 미달"·"주가 미달(동전주)" 모두 인식
+    assert dates["000100"] == "20260711"
+
+
 def test_price_not_counted_before_launch():
     # 6월(시행 전) 종가 900 계속이어도 주가미달 카운트 안 됨 → price row 없음
     dates = [f"202606{d:02d}" for d in range(1, 31)]

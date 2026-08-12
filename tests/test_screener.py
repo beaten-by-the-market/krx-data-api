@@ -4,6 +4,7 @@ from __future__ import annotations
 import pandas as pd
 
 from krx_data_api import screener as scr
+from krx_data_api import supervision as sv
 
 
 def _long_cache(code, dates, closes, caps, name="테스트", srt="000010", mkt="KOSDAQ", vols=None):
@@ -300,3 +301,30 @@ def test_current_designations_writes_csv(tmp_path):
     # CSV 왕복
     back = pd.read_csv(out, dtype={"표준코드": str}, encoding="utf-8-sig")
     assert "가가종목" in set(back["종목명"])
+
+
+def test_reason_mask_matches_combined_labels():
+    # KRX supervised는 다중사유를 콤마로 결합 → 부분매칭. (종류주식도 부분매칭되므로 스코핑은 별도)
+    s = pd.Series([
+        "시가총액 미달",
+        "시가총액 미달,주가 미달(동전주)",
+        "주가 미달(동전주),시가총액 미달",
+        "상장폐지사유 발생",
+        "종류주식 시가총액 미달",
+    ])
+    assert list(scr.reason_mask(s, scr.KRX_MKTCAP_REASONS)) == [True, True, True, False, True]
+    assert list(scr.reason_mask(s, scr.KRX_PRICE_REASONS)) == [False, True, True, False, False]
+
+
+def test_kosdaq_mktcap_delist_requires_45_consecutive():
+    # 코스닥 시총상폐(제54조①12호) 회복 = 300억 이상 '45일 연속'. 44연속(<45)이면 상폐확정.
+    # (구 코드의 '10연속/누적30'이었다면 RECOVERED로 잘못 판정됐을 시나리오)
+    thr = 30_000_000_000
+    dates = [f"2026{i:04d}" for i in range(1001, 1091)]   # 90 dummy 매매거래일
+    caps = [thr] * 44 + [thr - 1] * 46                     # 44연속 회복 후 미달, 누적 44
+    rec = sv.evaluate_mktcap_recovery_failure(
+        dates, caps, dates[0], thr, **scr.MKTCAP_DELIST_RECOVERY["KOSDAQ"])
+    assert scr.MKTCAP_DELIST_RECOVERY["KOSDAQ"] == {"consec_days": 45, "cumul_days": None}
+    assert rec.max_consec == 44
+    assert rec.recovered_by is None
+    assert rec.status == sv.DELIST_CONFIRMED

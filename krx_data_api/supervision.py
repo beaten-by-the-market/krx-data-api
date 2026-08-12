@@ -341,11 +341,13 @@ def evaluate_mktcap_recovery_failure(
     cumul_days: Optional[int] = MKTCAP_RECOVERY_CUMUL_DAYS,
 ) -> MktcapRecoveryResult:
     """시가총액 미달로 관리종목 지정된 후 window_days(90) 매매거래일 동안 시가총액
-    회복조건을 충족 못하면 상장폐지. 시장별로 회복조건이 다르다:
+    회복조건을 충족 못하면 상장폐지. 회복조건은 규정상 **연속 45일**이다:
 
-    - 유가(제48조①9호): 기준 이상이 **45일 연속**(consec_days=45, cumul_days=None).
-    - 코스닥(제54조①12호): 기준 이상 **10일 연속(가) 또는 누적 30일(나)** 중 하나.
+    - 유가(제48조①9호): 500억 이상이 **45일 연속**(consec_days=45, cumul_days=None).
+    - 코스닥(제54조①12호): 300억 이상이 **45일 연속**(consec_days=45, cumul_days=None).
+      ※ '10일 연속 or 누적 30일'은 보통주가 아니라 종류주식(우선주) 20억 기준이다.
 
+    함수 자체는 시장 무관 일반형이며 시장별 값은 screener.MKTCAP_DELIST_RECOVERY로 주입한다.
     consec_days : '연속' 회복 일수. cumul_days : '누적' 회복 일수(None이면 누적조건 없음).
     threshold : 기준액(scalar) 또는 날짜별 함수 f(date)->기준액(부칙 시기별 기준용).
     caps : 시가총액 시계열(None=매매거래일 아님/스킵).

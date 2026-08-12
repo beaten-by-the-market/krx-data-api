@@ -44,12 +44,15 @@ PRICE_MARKETS = {"KOSPI", "KOSDAQ"}
 # 주가 미달 일수는 **시행일(2026.7.1) 이후 최초로 1,000원 미만인 날부터** 산정(부칙 제3조①).
 PRICE_COUNT_START = "20260701"
 
-# 시가총액 미달 상장폐지 회복조건(시장별로 다름). 지정 후 90거래일 내 회복 실패 시 상폐.
-#   유가(제48조①9호): 기준 이상 45일 연속.
-#   코스닥(제54조①12호): 기준 이상 10일 연속(가) 또는 누적 30일(나) 중 하나.
+# 시가총액 미달 상장폐지 회복조건. 지정 후 90매매거래일 내 회복 실패 시 상폐.
+#   유가(제48조①9호): 500억 이상이 45일 연속.
+#   코스닥(제54조①12호): 300억 이상이 45일 연속. (2026.5.13 개정, 단일 조건 — 규정 원문
+#     "…연속하여 45일 이상 계속되지 못하는 경우")
+#   ※ '10일 연속 or 누적 30일'은 보통주가 아니라 **종류주식(우선주)** 20억 기준이다
+#     (유가 제64조①5호·코스닥 제82조①4호). 스크리너는 종류주식을 제외하므로 적용 대상 아님.
 MKTCAP_DELIST_RECOVERY = {
     "KOSPI": {"consec_days": 45, "cumul_days": None},
-    "KOSDAQ": {"consec_days": 10, "cumul_days": 30},
+    "KOSDAQ": {"consec_days": 45, "cumul_days": None},
 }
 
 
@@ -81,10 +84,23 @@ INFRA_FUND_CODES = {
     "KR7415640002",  # KB발해인프라
 }
 
-# supervised.LIST_BZ_RSN_NM 중 보통주 시가총액/주가 미달 사유 라벨.
-# 우선주("종류주식 ...")는 별도 조항이고 스크리너에서 제외하므로 대조 대상에서도 뺀다.
-KRX_MKTCAP_REASONS = {"시가총액 미달"}
-KRX_PRICE_REASONS = {"주가 미달"}
+# supervised.LIST_BZ_RSN_NM은 다중사유를 콤마로 결합한다(예 "시가총액 미달,주가 미달(동전주)").
+# 따라서 정확일치가 아니라 **부분문자열**로 매칭해야 콤바인 라벨을 놓치지 않는다.
+#   - "시가총액 미달"은 "종류주식 시가총액 미달"(우선주)에도 부분매칭되므로, 대조 시 반드시
+#     유니버스(보통주·외국주·DR)로 스코핑해 우선주를 제외한다.
+#   - "주가 미달"은 신설 라벨 "주가 미달(동전주)"를 포함한다.
+KRX_MKTCAP_REASONS = ("시가총액 미달",)
+KRX_PRICE_REASONS = ("주가 미달",)
+
+
+def reason_mask(series, needles) -> "pd.Series":
+    """LIST_BZ_RSN_NM(콤마결합 다중사유)에 needles 중 하나라도 부분문자열로 들어있으면 True."""
+    s = series.astype(str)
+    mask = None
+    for nd in needles:
+        m = s.str.contains(nd, regex=False, na=False)
+        mask = m if mask is None else (mask | m)
+    return mask
 
 # 카운팅 시작일: 2026.5.13 규정 개정(시총 규칙 개정 + 주가 규칙 신설)으로 임계값/규칙이
 # 바뀌었고 그 시점부터 30거래일 미달 카운트가 시작된다(사용자 확인). 개정 전 날짜는
@@ -404,7 +420,7 @@ def price_recovery_failure_from_supervised(
     현재는 주가미달 공식 지정이 없을 수 있어 결과가 빌 수 있다(신설 규정).
     """
     sup = fetch("supervised", session=session)
-    pm = sup[sup["LIST_BZ_RSN_NM"].isin(KRX_PRICE_REASONS)]
+    pm = sup[reason_mask(sup["LIST_BZ_RSN_NM"], KRX_PRICE_REASONS)]
     designations = list(zip(pm["ISU_CD_FULL"].astype(str), pm["FST_DESIGN_DD"]))
     return screen_price_recovery_failure(cache_df, designations, **kwargs)
 
@@ -587,10 +603,13 @@ def reconcile_with_supervised(
 
     krx_reasons = KRX_MKTCAP_REASONS if reason == REASON_MKTCAP else KRX_PRICE_REASONS
     sup = fetch("supervised", session=session)
-    # 표준코드 컬럼: ISU_CD_FULL (KR7...). 사유: LIST_BZ_RSN_NM.
-    # 우선주("종류주식 ...")도 동일 규칙이라 대조 대상에 포함.
-    sup_reason = sup[sup["LIST_BZ_RSN_NM"].isin(krx_reasons)].copy()
+    # 표준코드 컬럼: ISU_CD_FULL (KR7...). 사유: LIST_BZ_RSN_NM(콤마결합 다중사유 → 부분매칭).
+    sup_reason = sup[reason_mask(sup["LIST_BZ_RSN_NM"], krx_reasons)].copy()
     krx_set = set(sup_reason["ISU_CD_FULL"])
+    # 부분매칭은 "종류주식 시가총액 미달"(우선주)도 잡으므로 유니버스(단축코드)로 스코핑해 제외.
+    if universe is not None:
+        krx_set = {c for c in krx_set if str(c)[3:9] in universe}
+        sup_reason = sup_reason[sup_reason["ISU_CD_FULL"].apply(lambda c: str(c)[3:9] in universe)]
 
     match = my_set & krx_set
     my_only = my_set - krx_set

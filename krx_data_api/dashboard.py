@@ -219,9 +219,13 @@ def stock_status_rows(
     return {"rows": rows, "counts": counts, "my_cap": my_cap, "my_price": my_price}
 
 
-def _official_from_supervised(supervised: pd.DataFrame):
-    def _codes(reason):
-        return set(supervised[supervised["LIST_BZ_RSN_NM"] == reason]["ISU_CD"].astype(str).str.zfill(6))
+def _official_from_supervised(supervised: pd.DataFrame, universe: Optional[set] = None):
+    # LIST_BZ_RSN_NM은 다중사유를 콤마로 결합("시가총액 미달,주가 미달(동전주)")하므로 부분매칭.
+    # "시가총액 미달"은 "종류주식 시가총액 미달"(우선주)도 잡으니 유니버스로 스코핑해 제외한다.
+    def _codes(needle):
+        m = supervised["LIST_BZ_RSN_NM"].astype(str).str.contains(needle, regex=False, na=False)
+        codes = set(supervised[m]["ISU_CD"].astype(str).str.zfill(6))
+        return (codes & universe) if universe is not None else codes
     dates = {str(r["ISU_CD"]).zfill(6): str(r["FST_DESIGN_DD"]).replace("/", "")
              for _, r in supervised.iterrows()}
     return _codes("시가총액 미달"), _codes("주가 미달"), dates
@@ -252,7 +256,7 @@ def build_dashboard_artifacts(
     """
     official_available = supervised is not None
     off_cap, off_price, off_dates = (
-        _official_from_supervised(supervised) if official_available else (set(), set(), {})
+        _official_from_supervised(supervised, universe=universe) if official_available else (set(), set(), {})
     )
     res = stock_status_rows(
         cache_df, universe,
