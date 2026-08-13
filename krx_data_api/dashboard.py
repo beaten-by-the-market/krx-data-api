@@ -265,19 +265,28 @@ def build_dashboard_artifacts(
     )
     rows, counts, my_cap, my_price = res["rows"], res["counts"], res["my_cap"], res["my_price"]
 
-    # KIND 관리종목 지정일(종목명 매칭). admin_issue는 코드가 없어 종목명으로 조인한다.
-    kind_map = {}
+    # KIND 관리종목 지정일. admin_issue는 코드가 없어 종목명으로 조인하되, **지정사유로 트랙을
+    # 구분**한다. 한 종목이 시총·주가 중 하나만 공식 지정일 수 있어(예: 시총만 공식, 주가는 예측),
+    # 사유 매칭 없이 이름만으로 붙이면 다른 트랙 행에 지정일이 새어 예측을 공식처럼 보이게 한다.
+    kind_map = {}  # 종목명 -> [(지정사유, 지정일YYYYMMDD), ...]
     if admin_issue is not None and "종목명" in admin_issue.columns and "지정일" in admin_issue.columns:
+        has_reason = "지정사유" in admin_issue.columns
         for _, a in admin_issue.iterrows():
             nm = str(a["종목명"]).strip()
             kd = str(a["지정일"]).replace("/", "").replace("-", "").strip()[:8]
+            rsn = str(a["지정사유"]) if has_reason else ""
             if nm and len(kd) == 8:
-                kind_map[nm] = kd
+                kind_map.setdefault(nm, []).append((rsn, kd))
     designated_states = {S_DESIGNATED, S_RELEASE_PENDING, S_DELISTING_RISK, S_DELISTING_CONFIRMED}
     for r in rows:
-        r["kind_design_date"] = (
-            kind_map.get(str(r["name"]).strip()) if r["state"] in designated_states else None
-        )
+        kd = None
+        if r["state"] in designated_states:
+            want = "시가총액 미달" if r["reason"] == "mktcap" else "주가 미달"
+            for rsn, d in kind_map.get(str(r["name"]).strip(), []):
+                if (not rsn) or (want in rsn):  # 지정사유 없으면(구버전) 이름매칭 폴백
+                    kd = d
+                    break
+        r["kind_design_date"] = kd
 
     def _recon(mine, off):
         return {

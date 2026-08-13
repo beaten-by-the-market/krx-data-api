@@ -113,6 +113,23 @@ def test_kind_admin_issue_designation_date():
     assert r["kind_design_date"] == "20260324"  # 종전 지정분 원본 지정일
 
 
+def test_kind_design_date_is_reason_scoped():
+    # 시총·주가 둘 다 내 판정상 지정이지만 KIND는 '시가총액 미달'로만 지정한 경우,
+    # 시총 행에만 KIND 지정일이 붙고 주가 행엔 새지 않아야 한다(공식 미지정 예측이 공식처럼 보이면 안 됨).
+    dates = [f"202607{d:02d}" for d in range(1, 31)]  # 7월(주가 카운트 시작 후) 30일
+    rows = _one_stock("KR7000010000", "000100", "가가", "KOSDAQ",
+                      dates, [500] * 30, [10_000_000_000] * 30)  # 종가 500(<1,000), 시총 100억(<200억)
+    admin = pd.DataFrame({
+        "종목명": ["가가"], "지정일": ["2026/08/13"], "지정사유": ["시가총액 미달"],
+    })
+    art = dash.build_dashboard_artifacts(_cache(rows), {"000100"}, admin_issue=admin)
+    mk = [x for x in art["rows"] if x["reason"] == "mktcap"][0]
+    pr = [x for x in art["rows"] if x["reason"] == "price"][0]
+    assert mk["state"] == "designated" and pr["state"] == "designated"
+    assert mk["kind_design_date"] == "20260813"   # 시총 행: 사유 일치 → 부착
+    assert pr["kind_design_date"] is None          # 주가 행: 사유 불일치 → 안 샘
+
+
 def test_kind_admin_issue_none_when_not_designated():
     # 임박(미지정) 종목은 kind_design_date=None
     dates = [f"202606{d:02d}" for d in range(1, 26)]  # 25일 → 임박
