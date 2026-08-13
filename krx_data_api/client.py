@@ -20,16 +20,22 @@ def _normalize_kosdaq_global(df: pd.DataFrame, **_: Any) -> pd.DataFrame:
     return df
 
 
+def _attach_current_datetime(df: pd.DataFrame, payload: dict) -> pd.DataFrame:
+    """KRX가 최상위로 주는 서버 조회시각을 `df.attrs`에 보존합니다."""
+    df.attrs["current_datetime"] = payload.get("CURRENT_DATETIME")
+    return df
+
+
 def _json_output_to_df(payload: dict, **_: Any) -> pd.DataFrame:
     """`getJsonData.cmd`가 `{"output": [...]}` 형태로 줄 때."""
     rows = payload.get("output") or payload.get("OutBlock_1") or []
-    return pd.DataFrame(rows)
+    return _attach_current_datetime(pd.DataFrame(rows), payload)
 
 
 def _json_outblock_to_df(payload: dict, **_: Any) -> pd.DataFrame:
     """`{"OutBlock_1": [...]}` 형태가 우선인 응답."""
     rows = payload.get("OutBlock_1") or payload.get("output") or []
-    return pd.DataFrame(rows)
+    return _attach_current_datetime(pd.DataFrame(rows), payload)
 
 
 _POST_PROCESSORS: dict[str, Callable[..., Any]] = {
