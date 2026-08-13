@@ -332,7 +332,7 @@ def build_dashboard_artifacts(
         "cache": {"first": dates[0] if dates else None, "last": dates[-1] if dates else None,
                   "trading_days": len(dates)},
         "official_available": official_available,
-        "disclaimer": ("공개 규정·공개 시장데이터 기반 비공식 추정치입니다. KRX 공식 판정이 "
+        "disclaimer": ("공개 규정·공개 시장데이터 기반 비공식 잠정치입니다. KRX 공식 판정이 "
                        "아닙니다. 시가총액 기준은 부칙 경과규정에 따라 시기별로 다르며, 주가 "
                        "미달은 2026.7.1 이후부터 산정합니다. 투자판단의 근거로 사용하지 마십시오."),
         "countdown_note": "연속 지속 가정 하의 최단 잔여 거래일. 기준을 회복/이탈하면 리셋됩니다.",
