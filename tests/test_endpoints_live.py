@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 import pandas as pd
 import pytest
 
-from krx_data_api import client, fetch, list_endpoints
+from krx_data_api import client, daily_snapshots, fetch, list_endpoints
 from krx_data_api.exceptions import KRXFetchError
 
 pytestmark = pytest.mark.skipif(
@@ -20,11 +20,19 @@ pytestmark = pytest.mark.skipif(
 
 
 def _recent_trading_day() -> str:
-    """Return the latest weekday, using Friday when today is a weekend."""
-    d = datetime.today()
-    while d.weekday() >= 5:
-        d -= timedelta(days=1)
-    return d.strftime("%Y%m%d")
+    """가장 최근에 '끝난' 매매거래일(YYYYMMDD).
+
+    달력상 평일을 쓰면 안 됩니다. 공휴일 trdDd로 all_stock_price를 부르면 KRX가
+    빈 응답 대신 **직전 거래일 데이터를 그대로** 주기 때문에, 테스트가 엉뚱한
+    날짜로 조용히 통과합니다. 그래서 실제 거래일 목록(daily_snapshots)에서 뽑습니다.
+    기준종목 시세추이에는 당일이 장중에 아직 없으므로 직전 거래일이 나옵니다.
+    """
+    end = datetime.today()
+    start = end - timedelta(days=14)
+    days = daily_snapshots.trading_days(
+        start.strftime("%Y%m%d"), end.strftime("%Y%m%d")
+    )
+    return days[-1]
 
 
 def test_catalog_lists_registered_endpoints():
@@ -165,9 +173,11 @@ def test_supervised_json():
 
 
 def test_vi_triggered_json():
-    day = _recent_trading_day()
-    df = fetch("vi_triggered", strtDd=day, endDd=day)
+    # 고정일로 조회합니다. 이 화면은 당일 장중에는 비어 있어서
+    # _recent_trading_day()로 부르면 0행이 오고, 빈 응답은 컬럼조차 없습니다.
+    df = fetch("vi_triggered", strtDd="20250902", endDd="20250902")
     assert isinstance(df, pd.DataFrame)
+    assert len(df) > 0
     assert "VI_KIND_NM" in df.columns
     assert "VI_TG_TM" in df.columns
 
