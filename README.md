@@ -149,6 +149,7 @@ df_adj = fetch(
 )
 
 # 신규상장종목 현황: 긴 기간은 CSV 기본
+# JSON판(new_listing_json)은 조회기간 최대 730일 — 초과하면 호출 전에 KRXFetchError입니다.
 df = fetch("new_listing", strtDd="20240101", endDd="20260701")
 df_json = fetch("new_listing_json", strtDd="20260401", endDd="20260701")
 
@@ -181,7 +182,7 @@ df_csv = fetch("vi_triggered_csv", strtDd="20260701", endDd="20260701")
 # 개별종목 공매도 거래
 df = fetch("short_selling_individual", trdDd="20260701")
 
-# 매매거래정지 종목 현황: 종목 지정 필수, 조회기간 최대 2년
+# 매매거래정지 종목 현황: 종목 지정 필수, 조회기간 최대 730일
 # JSON은 정지 직전 최종매매일 시세(종가·거래량·시가총액)까지 포함합니다.
 df = fetch(
     "trading_halt",
@@ -206,6 +207,9 @@ from krx_data_api import list_endpoints, endpoint_info
 
 print(list_endpoints())
 print(endpoint_info("new_listing"))
+
+# 조회기간 상한이 있는 화면은 spec에 max_period_days로 드러납니다 (없으면 상한 없음).
+print(endpoint_info("new_listing_json").get("max_period_days"))   # 730
 ```
 
 ## 직접 호출

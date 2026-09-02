@@ -96,6 +96,30 @@ def register_post_processor(name: str, func: Callable[..., Any]) -> None:
     _POST_PROCESSORS[name] = func
 
 
+def _check_period_limit(name: str, spec: dict, merged: dict) -> None:
+    """`max_period_days`가 있는 화면은 KRX에 보내기 전에 조회기간을 검사합니다.
+
+    한도를 넘기면 KRX는 본문이 'INVALIDPERIOD2'뿐인 400을 돌려주므로,
+    어느 파라미터가 문제인지 알 수 있는 예외로 바꿔 던집니다.
+    """
+    limit = spec.get("max_period_days")
+    if limit is None:
+        return
+    try:
+        start = datetime.strptime(str(merged["strtDd"]), "%Y%m%d")
+        end = datetime.strptime(str(merged["endDd"]), "%Y%m%d")
+    except (KeyError, ValueError):
+        # 날짜를 못 읽으면 판단하지 않고 KRX 응답에 맡깁니다.
+        return
+    days = (end - start).days
+    if days > limit:
+        raise KRXFetchError(
+            f"Endpoint {name!r} allows at most {limit} days per request "
+            f"(strtDd={merged['strtDd']} endDd={merged['endDd']} is {days} days). "
+            f"Split the range, or use a screen without the limit."
+        )
+
+
 def fetch(
     name: str,
     *,
@@ -133,6 +157,8 @@ def fetch(
         raise KRXFetchError(
             f"Endpoint {name!r} missing required params: {missing}"
         )
+
+    _check_period_limit(name, spec, merged)
 
     if auth and session is None:
         from .auth import get_krx_auth

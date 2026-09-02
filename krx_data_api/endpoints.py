@@ -236,6 +236,9 @@ ENDPOINTS = {
         "screen": "20001 신규상장종목 현황",
         "required": ["strtDd", "endDd"],
     },
+    # 조회기간은 730일까지만 허용됩니다 (초과하면 KRX가 'INVALIDPERIOD2'로 400).
+    # 달력 2년이 아니라 순수 일수 기준이라, 윤일이 낀 구간은 '정확히 2년'도 거절됩니다.
+    # 장기 구간은 끊어 호출하거나, 기간 제한이 없는 CSV판 new_listing을 쓰세요.
     "new_listing_json": {
         "bld": "dbms/MDC/STAT/issue/MDCSTAT20001",
         "method": "json",
@@ -250,6 +253,7 @@ ENDPOINTS = {
         },
         "post": ["json_outblock_to_df"],
         "screen": "20001 신규상장종목 현황 (JSON)",
+        "max_period_days": 730,
         "required": ["strtDd", "endDd"],
     },
     "offering_price_change_rate": {
@@ -400,7 +404,7 @@ ENDPOINTS = {
     },
     # 개별종목의 매매거래정지 이력(정지일/재개일/정지 직전 최종매매일 시세).
     # 종목 지정이 필수입니다 — isuCd를 비우거나 ALL로 보내면 항상 0행이 옵니다.
-    # 조회기간은 2년까지만 허용됩니다 (초과하면 KRX가 'INVALIDPERIOD2'로 400).
+    # 조회기간은 730일까지만 허용됩니다 (초과하면 KRX가 'INVALIDPERIOD2'로 400).
     "trading_halt": {
         "bld": "dbms/MDC/STAT/issue/MDCSTAT21301",
         "method": "json",
@@ -410,6 +414,7 @@ ENDPOINTS = {
         },
         "post": ["json_output_to_df"],
         "screen": "매매거래정지 종목 현황 (MDCSTAT21301)",
+        "max_period_days": 730,
         "required": ["isuCd", "isuCd2", "strtDd", "endDd"],
     },
     # CSV는 JSON보다 컬럼이 적습니다(번호/종목코드/종목명/시장구분/정지일/재개일).
