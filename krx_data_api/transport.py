@@ -7,7 +7,7 @@ import requests
 
 from .exceptions import KRXAuthRequiredError, KRXFetchError
 
-BASE = "http://data.krx.co.kr"
+BASE = "https://data.krx.co.kr"
 OTP_URL = f"{BASE}/comm/fileDn/GenerateOTP/generate.cmd"
 CSV_URL = f"{BASE}/comm/fileDn/download_csv/download.cmd"
 JSON_URL = f"{BASE}/comm/bldAttendant/getJsonData.cmd"

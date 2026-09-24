@@ -16,6 +16,8 @@ pip install git+https://github.com/beaten-by-the-market/krx-data-api.git
 
 프로젝트 루트의 `.env`에 KRX 계정 정보를 저장합니다.
 
+2026-09 현재 KRX는 비로그인 요청을 화면 구분 없이 `LOGOUT`으로 거절하므로, 사실상 모든 호출에 계정이 필요합니다.
+
 ```text
 KRX_ID=your_id
 KRX_PW=your_password
