@@ -62,6 +62,15 @@ class KRXAuth:
     def mbr_no(self) -> Optional[str]:
         return self._mbr_no
 
+    def invalidate(self) -> None:
+        """다음 `session` 접근 때 새로 로그인하게 합니다.
+
+        KRX가 TTL 전에 세션을 끊어 fetch()가 LOGOUT을 받으면
+        이것으로 재로그인합니다.
+        """
+        with self._lock:
+            self._session = None
+
     def _expired(self) -> bool:
         return (time.monotonic() - self._login_at) > SESSION_TTL_SECONDS
 

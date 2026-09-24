@@ -7,7 +7,7 @@ import pandas as pd
 import requests
 
 from . import endpoints, transport
-from .exceptions import KRXAuthRequiredError, KRXFetchError
+from .exceptions import KRXAuthError, KRXAuthRequiredError, KRXFetchError
 
 
 def _read_csv_eucKR(raw: bytes, **_: Any) -> pd.DataFrame:
@@ -120,6 +120,23 @@ def _check_period_limit(name: str, spec: dict, merged: dict) -> None:
         )
 
 
+def _resolve_auth(*, required: bool):
+    """자격증명이 설정돼 있으면 KRXAuth 싱글톤, 없으면 None.
+
+    get_krx_auth()는 자격증명이 없을 때만 KRXAuthError를 던지고 로그인은
+    `.session` 접근 때 하므로, 여기서 잡는 예외는 '미설정'뿐입니다.
+    로그인 실패(CD010 등)는 호출부의 `.session`에서 그대로 올라갑니다.
+    """
+    from .auth import get_krx_auth
+
+    try:
+        return get_krx_auth()
+    except KRXAuthError:
+        if required:
+            raise
+        return None
+
+
 def fetch(
     name: str,
     *,
@@ -127,7 +144,7 @@ def fetch(
     menu_id: Optional[str] = None,
     session: Optional[requests.Session] = None,
     post: Optional[list[str]] = None,
-    auth: bool = False,
+    auth: Optional[bool] = None,
     **params: Any,
 ) -> pd.DataFrame:
     """카탈로그에 등록된 KRX 엔드포인트를 호출해 DataFrame으로 반환.
@@ -137,9 +154,14 @@ def fetch(
     name : 카탈로그 이름 (endpoints.ENDPOINTS의 키)
     method : "csv" 또는 "json"으로 override. None이면 카탈로그의 기본값.
     menu_id : Referer에 들어갈 menuId override. None이면 카탈로그 기본값.
-    session : 재사용할 requests.Session. None이면 매 호출마다 새 세션.
+    session : 직접 넘길 requests.Session. 보통은 비워 두세요 — 그러면
+        KRX_ID/KRX_PW로 로그인한 싱글톤 세션을 씁니다. 직접 넘긴 세션은
+        그대로 쓰고 재로그인하지 않으므로, 넘긴다면 get_krx_auth().session을
+        넘기세요 (2026-09부터 KRX는 비로그인 요청을 전부 'LOGOUT'으로 거절).
     post : 카탈로그의 post를 override하고 싶을 때 (보통 불필요)
-    auth : True면 get_krx_auth()의 로그인된 세션을 사용 (보호 엔드포인트용)
+    auth : None(기본)이면 자격증명이 있을 때 로그인 세션, 없으면 비로그인.
+        True면 로그인 필수(자격증명이 없으면 KRXAuthError),
+        False면 비로그인 강제.
     **params : bld에 전달할 추가/오버라이드 파라미터 (defaults에 머지됨).
         값이 None이면 해당 파라미터를 전송하지 않습니다.
         offering_price_change_rate 계열과 individual_price_trend는
@@ -160,12 +182,11 @@ def fetch(
 
     _check_period_limit(name, spec, merged)
 
-    if auth and session is None:
-        from .auth import get_krx_auth
-
-        session = get_krx_auth().session
-
-    user_supplied_session = session is not None
+    krx_auth = None
+    if session is None and auth is not False:
+        krx_auth = _resolve_auth(required=auth is True)
+        if krx_auth is not None:
+            session = krx_auth.session
 
     def _call() -> Any:
         if method == "csv":
@@ -181,13 +202,13 @@ def fetch(
     try:
         initial: Any = _call()
     except KRXAuthRequiredError:
-        # KRX가 비로그인 세션에 OTP 발급을 거부했다 (응답='LOGOUT').
-        # 호출자가 세션을 직접 주입한 경우는 의도가 있다고 보고 재시도하지 않음.
-        if user_supplied_session:
+        # 로그인 세션인데도 'LOGOUT'이면 KRX가 TTL 전에 세션을 끊은 것.
+        # 한 번만 새로 로그인해 재시도한다.
+        # 호출자가 세션을 주입했거나 비로그인으로 부른 경우는 그대로 올린다.
+        if krx_auth is None:
             raise
-        from .auth import get_krx_auth
-
-        session = get_krx_auth().session
+        krx_auth.invalidate()
+        session = krx_auth.session
         initial = _call()
 
     # 호출자가 method를 override했는데 post는 명시 안 한 경우,

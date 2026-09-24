@@ -84,6 +84,7 @@ def test_offering_price_change_rate_adjusted_price_option(monkeypatch):
         return "col\n1\n".encode("EUC-KR")
 
     monkeypatch.setattr(client.transport, "csv_download", fake_csv_download)
+    monkeypatch.setattr(client, "_resolve_auth", lambda **_: None)  # 로그인 없이
 
     fetch(
         "offering_price_change_rate",
@@ -114,6 +115,7 @@ def test_individual_price_trend_adjusted_price_option(monkeypatch):
         return "col\n1\n".encode("EUC-KR")
 
     monkeypatch.setattr(client.transport, "csv_download", fake_csv_download)
+    monkeypatch.setattr(client, "_resolve_auth", lambda **_: None)  # 로그인 없이
 
     # 기본값: 수정주가 (adjStkPrc_check=Y, adjStkPrc=2)
     fetch(

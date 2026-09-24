@@ -3,7 +3,7 @@
 KRX 정보데이터시스템(`data.krx.co.kr`) 호출을 endpoint 이름 기반 `fetch()` 함수로 감싼 Python 패키지입니다.
 
 - `getJsonData.cmd` JSON API와 OTP 2단계 CSV 다운로드를 같은 `fetch()` 인터페이스로 호출합니다.
-- KRX 로그인 세션이 필요한 호출은 `KRX_ID` / `KRX_PW` 환경변수로 자동 로그인합니다.
+- `KRX_ID` / `KRX_PW`만 설정하면 모든 호출이 자동으로 로그인 세션을 씁니다 (KRX가 2026-09부터 비로그인 요청을 전부 거절).
 - 기간 조회에서 CSV가 JSON보다 긴 기간을 허용하는 화면은 CSV를 기본 방식으로 둡니다.
 
 ## 설치
@@ -14,14 +14,27 @@ pip install git+https://github.com/beaten-by-the-market/krx-data-api.git
 
 ## 인증 설정
 
-프로젝트 루트의 `.env`에 KRX 계정 정보를 저장합니다.
+2026-09부터 KRX는 비로그인 요청을 화면 구분 없이 `LOGOUT`으로 거절합니다. 그래서 모든 호출에 KRX 계정이 필요합니다.
 
-2026-09 현재 KRX는 비로그인 요청을 화면 구분 없이 `LOGOUT`으로 거절하므로, 사실상 모든 호출에 계정이 필요합니다.
+`KRX_ID` / `KRX_PW`를 환경변수로 넣거나 `.env`에 저장하세요. 세션 정보(`JSESSIONID` 등)는 필요 없습니다. `fetch()`가 첫 호출 때 로그인하고, 25분 동안 세션을 재사용하다 만료되면 다시 로그인합니다.
 
 ```text
 KRX_ID=your_id
 KRX_PW=your_password
 ```
+
+`.env`는 **`fetch()`를 호출하는 쪽의 작업 폴더**에서 찾습니다. 이 레포를 클론해 편집 가능 설치(`pip install -e .`)했다면 레포 루트의 `.env`도 찾지만, `pip install git+...`로 설치한 다른 프로젝트에서는 레포의 `.env`가 보이지 않습니다. 그 프로젝트 폴더에 `.env`를 두거나 환경변수로 넣으세요.
+
+세션은 직접 넘기지 않는 것이 기본입니다. `session=requests.Session()`처럼 로그인하지 않은 세션을 넘기면 라이브러리는 그 세션을 그대로 쓰고 재로그인하지 않아 `LOGOUT` 오류가 납니다. 여러 호출에 같은 세션을 명시해야 한다면 로그인된 세션을 넘기세요.
+
+```python
+from krx_data_api import fetch, get_krx_auth
+
+s = get_krx_auth().session
+df = fetch("listed_stocks", session=s)
+```
+
+`auth=` 인자로 동작을 강제할 수 있습니다. 기본값 `None`은 자격증명이 있으면 로그인, 없으면 비로그인으로 시도합니다. `True`는 자격증명이 없으면 바로 `KRXAuthError`를 던지고, `False`는 로그인하지 않습니다.
 
 Google Colab에서는 Secrets에서 읽어 환경변수로 넣으면 됩니다.
 

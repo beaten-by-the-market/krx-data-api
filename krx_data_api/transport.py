@@ -76,7 +76,8 @@ def json_data(
     if resp.text.strip() == "LOGOUT":
         raise KRXAuthRequiredError(
             f"KRX refused JSON request for bld={bld} (response='LOGOUT'). "
-            "Login session required."
+            "Login session required — set KRX_ID/KRX_PW env vars or pass "
+            "session=get_krx_auth().session."
         )
     if not resp.ok:
         raise KRXFetchError(
