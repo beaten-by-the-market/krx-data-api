@@ -197,6 +197,16 @@ df_csv = fetch("vi_triggered_csv", strtDd="20260701", endDd="20260701")
 # 개별종목 공매도 거래
 df = fetch("short_selling_individual", trdDd="20260701")
 
+# 공매도 순보유잔고: 전종목 하루치(mktTpCd 1=KOSPI, 2=KOSDAQ, 6=KONEX)
+df = fetch("short_balance_individual", trdDd="20261016", mktTpCd="2")
+# 개별종목 일별 추이: 조회기간 최대 730일
+df = fetch(
+    "short_balance_individual_trend",
+    isuCd="KR7005930003",
+    strtDd="20260901",
+    endDd="20261016",
+)
+
 # 매매거래정지 종목 현황: 종목 지정 필수, 조회기간 최대 730일
 # JSON은 정지 직전 최종매매일 시세(종가·거래량·시가총액)까지 포함합니다.
 df = fetch(
@@ -274,6 +284,8 @@ df = pd.read_csv(BytesIO(raw), encoding="EUC-KR")
 | `trading_halt` | `MDCSTAT21301` | 매매거래정지 종목 현황 | JSON |
 | `trading_halt_csv` | `MDCSTAT21301` | 매매거래정지 종목 현황 | CSV |
 | `short_selling_individual` | `MDCSTAT30101` | 32001 개별종목 공매도 거래 | JSON |
+| `short_balance_individual` | `MDCSTAT30501` | 33001 개별종목 공매도 순보유잔고 | JSON |
+| `short_balance_individual_trend` | `MDCSTAT30502` | 33001 개별종목 공매도 순보유잔고 (개별종목 추이) | JSON |
 | `listing_special` | `MDCSTAT24401` | 상장특례 현황 | CSV |
 | `ipo_price_return` | `MDCSTAT24401` | 20043 공모가 대비 주가수익률 | JSON |
 | `listed_bonds` | `MDCSTAT10801` | 14011 상장채권 상세검색 | JSON |

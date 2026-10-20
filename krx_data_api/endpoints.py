@@ -454,6 +454,50 @@ ENDPOINTS = {
         "post": ["json_output_to_df"],
         "screen": "32001 개별종목 공매도 거래",
     },
+    # 공매도 순보유잔고 전종목(trdDd 하루). menuId MDC02030301.
+    # mktTpCd: 1=KOSPI, 2=KOSDAQ, 6=KONEX. 잔고는 보고의무발생일 기준이라
+    # 최근 2~3 거래일은 아직 비어 있습니다 (빈 응답은 컬럼조차 없음).
+    # 같은 화면의 '개별종목' 조회는 bld가 다릅니다 → short_balance_individual_trend.
+    "short_balance_individual": {
+        "bld": "dbms/MDC/STAT/srt/MDCSTAT30501",
+        "method": "json",
+        "menu_id": "MDC02030301",
+        "defaults": {
+            "searchType": "1",  # 조회구분 = 전종목
+            "mktTpCd": "1",
+            "tboxisuCd_finder_srtisu0_0": "",
+            "isuCd": "",
+            "isuCd2": "",
+            "codeNmisuCd_finder_srtisu0_0": "",
+            "param1isuCd_finder_srtisu0_0": "",
+            "share": "1",
+            "money": "1",
+            "csvxls_isNo": "false",
+        },
+        "post": ["json_output_to_df"],
+        "screen": "33001 개별종목 공매도 순보유잔고",
+    },
+    # 33001 화면에서 조회구분=개별종목일 때의 일별 추이. 조회기간은 730일까지
+    # (초과하면 KRX가 'INVALIDPERIOD2'로 400). isuCd2는 비워도 됩니다.
+    "short_balance_individual_trend": {
+        "bld": "dbms/MDC/STAT/srt/MDCSTAT30502",
+        "method": "json",
+        "menu_id": "MDC02030301",
+        "defaults": {
+            "searchType": "2",  # 조회구분 = 개별종목
+            "tboxisuCd_finder_srtisu0_0": "",
+            "isuCd2": "",
+            "codeNmisuCd_finder_srtisu0_0": "",
+            "param1isuCd_finder_srtisu0_0": "",
+            "share": "1",
+            "money": "1",
+            "csvxls_isNo": "false",
+        },
+        "post": ["json_output_to_df"],
+        "screen": "33001 개별종목 공매도 순보유잔고 (개별종목 추이)",
+        "max_period_days": 730,
+        "required": ["isuCd", "strtDd", "endDd"],
+    },
     "listed_bonds": {
         "bld": "dbms/MDC/STAT/standard/MDCSTAT10801",
         "method": "json",

@@ -65,6 +65,8 @@ def test_catalog_lists_registered_endpoints():
         "trading_halt",
         "trading_halt_csv",
         "short_selling_individual",
+        "short_balance_individual",
+        "short_balance_individual_trend",
         "listing_special",
         "ipo_price_return",
         "listed_bonds",
@@ -216,6 +218,37 @@ def test_trading_halt_csv():
 def test_trading_halt_requires_issue():
     with pytest.raises(KRXFetchError):
         fetch("trading_halt", strtDd="20240101", endDd="20251231")
+
+
+def test_short_balance_individual_json():
+    # 고정일로 조회합니다. 잔고는 보고의무발생일 기준이라 최근 2~3 거래일은 비어 있습니다.
+    df = fetch("short_balance_individual", trdDd="20261016", mktTpCd="2")
+    assert len(df) > 1000
+    assert "BAL_QTY" in df.columns
+    assert "BAL_RTO" in df.columns
+
+
+def test_short_balance_individual_trend_json():
+    df = fetch(
+        "short_balance_individual_trend",
+        isuCd="KR7005930003",
+        strtDd="20261001",
+        endDd="20261016",
+    )
+    assert len(df) > 0
+    assert "RPT_DUTY_OCCR_DD" in df.columns
+    assert "BAL_QTY" in df.columns
+
+
+def test_short_balance_individual_trend_period_limit():
+    # 731일은 KRX에 보내기 전에 막힙니다.
+    with pytest.raises(KRXFetchError):
+        fetch(
+            "short_balance_individual_trend",
+            isuCd="KR7005930003",
+            strtDd="20241015",
+            endDd="20261016",
+        )
 
 
 def test_ipo_price_return_json():
