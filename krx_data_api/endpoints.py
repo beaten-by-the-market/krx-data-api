@@ -98,7 +98,7 @@ ENDPOINTS = {
     },
     # MDCSTAT02303: 같은 12009 화면의 "일별추이" 탭.
     # 02301(기간합계, 투자자 유형이 행)과 달리 날짜가 행, 투자자 유형이 열이다.
-    # askBid: 1=매수, 2=매도, 3=순매수 / trdVolVal: 1=거래량, 2=거래대금.
+    # askBid: 1=매도, 2=매수, 3=순매수 / trdVolVal: 1=거래량, 2=거래대금.
     "investor_trading_individual_daily": {
         "bld": "dbms/MDC/STAT/standard/MDCSTAT02303",
         "method": "csv",
@@ -106,7 +106,7 @@ ENDPOINTS = {
         "defaults": {
             "inqTpCd": "2",       # 일별추이
             "trdVolVal": "2",     # 거래대금 (1=거래량)
-            "askBid": "3",        # 순매수 (1=매수, 2=매도)
+            "askBid": "3",        # 순매수 (1=매도, 2=매수)
             "detailView": "1",
             "tboxisuCd_finder_stkisu0_0": "",
             "isuCd2": "",

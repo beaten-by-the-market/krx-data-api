@@ -112,7 +112,7 @@ df_json = fetch(
 )
 
 # 투자자별 거래실적(개별종목) "일별추이": 날짜가 행, 투자자 유형이 열.
-# askBid=1 매수 / 2 매도 / 3 순매수(기본), trdVolVal=1 거래량 / 2 거래대금(기본)
+# askBid=1 매도 / 2 매수 / 3 순매수(기본), trdVolVal=1 거래량 / 2 거래대금(기본)
 df_daily = fetch(
     "investor_trading_individual_daily",
     isuCd="KR7005930003",
@@ -124,7 +124,7 @@ df_daily_buy = fetch(
     isuCd="KR7005930003",
     strtDd="20260625",
     endDd="20260701",
-    askBid="1",                    # 매수
+    askBid="2",                    # 매수
 )
 df_daily_json = fetch(
     "investor_trading_individual_daily_json",
