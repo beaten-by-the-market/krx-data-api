@@ -36,6 +36,8 @@ ENDPOINTS = {
         "defaults": {"mktId": "ALL"},
         "post": ["json_outblock_to_df"],
         "screen": "12001 전종목시세",
+        # trdDd 없이 부르면 KRX가 오류 없이 빈 표를 돌려주므로 호출 전에 막는다.
+        "required": ["trdDd"],
     },
     "all_stock_price_csv": {
         "bld": "dbms/MDC/STAT/standard/MDCSTAT01501",
@@ -44,6 +46,8 @@ ENDPOINTS = {
         "defaults": {"mktId": "ALL"},
         "post": ["read_csv_eucKR", "normalize_kosdaq_global"],
         "screen": "12001 전종목시세 (CSV)",
+        # trdDd 없이 부르면 KRX가 오류 없이 빈 표를 돌려주므로 호출 전에 막는다.
+        "required": ["trdDd"],
     },
     "individual_price_trend": {
         "bld": "dbms/MDC/STAT/standard/MDCSTAT01701",

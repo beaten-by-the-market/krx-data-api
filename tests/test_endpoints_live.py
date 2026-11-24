@@ -157,6 +157,31 @@ def test_individual_price_trend_adjusted_price_option(monkeypatch):
     assert captured[2]["adjBasDd"] == "20200101"
 
 
+@pytest.mark.parametrize("name", ["all_stock_price", "all_stock_price_csv"])
+def test_all_stock_price_requires_trdDd(monkeypatch, name):
+    # trdDd 없이 부르면 KRX는 오류 없이 빈 표를 주므로, 호출 전에 막아야 한다.
+    # (isuCd/strtDd/endDd는 개별종목 화면 파라미터라 요구하면 안 된다.)
+    sent: list[dict] = []
+
+    def fake(bld, params, *, session=None, menu_id=None):
+        sent.append(dict(params))
+        if name == "all_stock_price":
+            return {"OutBlock_1": []}
+        return "col\n1\n".encode("EUC-KR")
+
+    monkeypatch.setattr(client.transport, "json_data", fake)
+    monkeypatch.setattr(client.transport, "csv_download", fake)
+    monkeypatch.setattr(client, "_resolve_auth", lambda **_: None)  # 로그인 없이
+
+    with pytest.raises(KRXFetchError, match="trdDd"):
+        fetch(name)
+    assert sent == []
+
+    fetch(name, trdDd="20261124")
+    assert sent[0]["trdDd"] == "20261124"
+    assert "isuCd" not in sent[0]
+
+
 def test_listed_stocks_returns_nonempty():
     df = fetch("listed_stocks")
     assert isinstance(df, pd.DataFrame)
